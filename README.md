@@ -12,9 +12,22 @@ Dockerfile   one image: backend + frontend, migrations then uvicorn
 
 ## Run it locally
 
+One command, everything included (Postgres, schema, rate card, site):
+
 ```bash
-# 1. Postgres
-docker compose -f infra/docker-compose.yml up -d db
+make dev          # or: docker compose -f infra/docker-compose.yml up --build
+```
+
+Then open http://localhost:8000. Code and pages are mounted, so edits reload without a
+rebuild. `make down` stops it, `make reset` also deletes the database volume.
+
+Other targets: `make test`, `make seed`, `make psql`, `make logs`, `make lint`.
+
+### Without Docker
+
+```bash
+# 1. Postgres (brew install postgresql@16 && brew services start postgresql@16 && createdb proline)
+#    then set DATABASE_URL in backend/.env
 
 # 2. Python deps
 cd backend

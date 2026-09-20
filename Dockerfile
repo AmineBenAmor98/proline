@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/app/ app/
 COPY backend/migrations/ migrations/
+COPY backend/scripts/ scripts/
 COPY backend/alembic.ini .
 COPY frontend/ frontend/
 
