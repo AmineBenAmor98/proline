@@ -1,0 +1,86 @@
+# Proline Cleaning Solutions
+
+Quote capture, pricing and admin for Proline Cleaning Solutions (Montreal).
+One FastAPI process serves the API **and** the site — the same shape as kfz.
+
+```
+backend/     FastAPI: API, pricing engine, models, migrations
+frontend/    static HTML, CSS and vanilla JS (FR + EN + /admin)
+infra/       docker-compose for local Postgres, fly.toml for Toronto
+Dockerfile   one image: backend + frontend, migrations then uvicorn
+```
+
+## Run it locally
+
+```bash
+# 1. Postgres
+docker compose -f infra/docker-compose.yml up -d db
+
+# 2. Python deps
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+cp .env.example .env            # then set ADMIN_TOKEN
+
+# 3. Schema + a rate card so prices exist
+alembic upgrade head
+python -m scripts.seed_rate_card
+
+# 4. Serve everything on http://localhost:8000
+uvicorn app.main:app --reload
+```
+
+| URL | What |
+| --- | --- |
+| `/` `/commercial` `/soumission` | French site |
+| `/en` `/en/commercial` `/en/soumission` | English site |
+| `/admin` | Request list (asks for `ADMIN_TOKEN`) |
+| `/api/quotes` `POST` | Submit a request |
+| `/api/quotes/price` `POST` | Live residential price |
+| `/api/admin/requests` | List / patch, Bearer token |
+| `/docs` | OpenAPI |
+
+## Tests
+
+```bash
+cd backend
+pytest                  # pricing engine + pages, no database needed
+DATABASE_URL=postgresql+asyncpg://proline:proline@localhost:5432/proline pytest
+ruff check app tests scripts
+```
+
+The API tests skip themselves when `DATABASE_URL` is unset, so the suite still runs on a
+laptop with no Postgres.
+
+## How pricing works
+
+`backend/app/pricing/` is pure functions: inputs in, a breakdown out. No database, no clock,
+no network, so its tests need nothing running.
+
+- **Residential** — a flat grid by bedrooms and bathrooms, plus an area surcharge, priced
+  extras and a recurring discount. Returned to the visitor as a firm price.
+- **Commercial** — minutes of work per 100 sq ft per service, times the hourly rate, plus
+  restrooms, night access and travel. Computed and stored, **never shown**: the client is
+  told a written quote arrives within 24 h, and a human reviews the number first.
+
+Rate cards are versioned rows (`rate_cards`). A price change creates a new row; old quotes
+still recompute to what the client was given.
+
+## What is still a placeholder
+
+- **The rate grid** in `scripts/seed_rate_card.py` — every number is invented. Replace it
+  with Proline's real figures before any price is shown publicly.
+- **Admin auth** is a single shared `ADMIN_TOKEN`. Fine for one person; replace with real
+  auth before anyone else gets access.
+- **Photos, logo, review counts, email address** in the HTML, marked `[LIKE THIS]`.
+- **Notifications** are logged, not sent, until `RESEND_API_KEY` and the Twilio keys are set
+  and `ENVIRONMENT` is not `local`.
+
+## Deploy
+
+```bash
+fly deploy --config infra/fly.toml     # Toronto (yyz), the only Canadian region on Fly
+```
+
+Database and photo storage live in Supabase `ca-central-1` (Montreal), so client data stays
+in Canada end to end.
