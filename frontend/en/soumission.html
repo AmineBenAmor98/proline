@@ -4,147 +4,248 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Get a price — Proline Cleaning Solutions</title>
-<meta name="description" content="Obtenez votre prix de ménage résidentiel en ligne, ou votre soumission commerciale écrite sous 24 h. Montréal.">
+<meta name="description" content="Get your home cleaning price online, or your written commercial quote within 24 hours. Montreal.">
+<link rel="canonical" href="https://prolinesolutions.ca/soumission">
+<link rel="alternate" hreflang="fr-ca" href="https://prolinesolutions.ca/soumission">
+<link rel="alternate" hreflang="en-ca" href="https://prolinesolutions.ca/en/soumission">
+<link rel="icon" href="/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Karla:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/css/app.css">
 </head>
 <body data-locale="en">
 <div class="goldbar"></div>
+
 <header class="site-header">
-  <div class="container" style="display:flex;align-items:center;gap:24px;width:100%">
-    <a class="brand" href="/en"><img src="/img/logo.png" alt="Proline Cleaning Solutions" width="48" height="48">
-      <span><span class="brand-name">PROLINE</span><br><span class="brand-sub">Cleaning Solutions</span></span></a>
-    <nav class="site-nav"><span style="color:var(--body)">A question? <a href="tel:+15142424779"><strong>514 242-4779</strong></a></span></nav>
+  <div class="container">
+    <a class="brand" href="/en">
+      <img src="/img/logo.png" alt="">
+      <span class="brand-text">
+        <span class="brand-name">PROLINE</span>
+        <span class="brand-sub">Cleaning Solutions</span>
+      </span>
+    </a>
+    <nav class="site-nav">
+      <a class="navlink" href="/en">Home</a>
+      <a class="navlink" href="/en/commercial">Commercial</a>
+      <a class="navlink" href="/en/soumission" aria-current="page">Quote</a>
+      <a class="lang" href="/soumission">FR</a>
+      <a class="phone" href="tel:+15142424779">514&nbsp;242-4779</a>
+    </nav>
   </div>
 </header>
 
-<main class="container" style="padding-top:40px;padding-bottom:40px">
-  <h1>Your price, in three steps.</h1>
-  <p class="lead" style="margin:12px 0 28px">Answer a few questions. For a home, the price appears right away.</p>
+<main>
+  <section class="hero" style="padding-bottom:0">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Quote request</span>
+        <h1 style="font-size:clamp(1.9rem,3.4vw,2.6rem)">Your price, in three steps.</h1>
+        <p class="lead">Answer a few questions. For a home the price appears right away; for a commercial space our team reviews it and sends it within 24 hours.</p>
+      </div>
+    </div>
+  </section>
 
-  <div class="grid-2">
-    <form id="quote-form" novalidate>
-      <div class="steps">
-        <span class="step-pill" data-step-pill="1" aria-current="step">01 · The property</span>
-        <span class="step-pill" data-step-pill="2">02 · The need</span>
-        <span class="step-pill" data-step-pill="3">03 · Your details</span>
+  <section style="padding-top:36px">
+    <div class="container">
+      <div class="grid-2 lean" style="align-items:start">
+
+        <form id="quote-form" novalidate>
+          <div class="steps">
+            <span class="step-pill" data-step-pill="1" aria-current="step">01 · The property</span>
+            <span class="step-pill" data-step-pill="2">02 · The need</span>
+            <span class="step-pill" data-step-pill="3">03 · Your details</span>
+          </div>
+
+          <!-- Step 1 -->
+          <fieldset class="wizard-step" data-step="1">
+            <div class="field">
+              <span class="field-label">Type of request</span>
+              <div class="choice-row">
+                <label class="choice"><input type="radio" name="audience" value="residential" checked> Residential</label>
+                <label class="choice"><input type="radio" name="audience" value="commercial"> Commercial</label>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="field">
+                <label for="property_type">Property type</label>
+                <select id="property_type" name="property_type">
+                  <option value="house">House</option>
+                  <option value="condo">Condo</option>
+                  <option value="apartment">Apartment</option>
+                  <option value="office">Office</option>
+                  <option value="retail">Retail</option>
+                  <option value="building">Building</option>
+                  <option value="industrial">Industrial</option>
+                  <option value="construction">Construction site</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="area_sqft">Approximate area (sq ft)</label>
+                <input type="number" id="area_sqft" name="area_sqft" min="100" max="1000000" inputmode="numeric" placeholder="1200">
+              </div>
+            </div>
+
+            <div data-when="residential">
+              <div class="field-group">
+                <div class="field">
+                  <label for="bedrooms">Bedrooms</label>
+                  <select id="bedrooms" name="bedrooms"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
+                </div>
+                <div class="field">
+                  <label for="bathrooms">Bathrooms</label>
+                  <select id="bathrooms" name="bathrooms"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+                </div>
+              </div>
+            </div>
+
+            <div data-when="commercial" hidden>
+              <div class="field-group">
+                <div class="field">
+                  <label for="restrooms">Number of restrooms</label>
+                  <input type="number" id="restrooms" name="restrooms" min="0" max="200" inputmode="numeric" placeholder="3">
+                </div>
+                <div class="field">
+                  <label for="floors">Number of floors</label>
+                  <input type="number" id="floors" name="floors" min="1" max="100" inputmode="numeric" placeholder="2">
+                </div>
+              </div>
+              <label class="checkbox-row"><input type="checkbox" name="night_access"> Evening or night visits</label>
+            </div>
+
+            <div class="wizard-actions">
+              <button type="button" class="btn btn-primary" data-next="2">Continue</button>
+            </div>
+          </fieldset>
+
+          <!-- Step 2 -->
+          <fieldset class="wizard-step" data-step="2" hidden>
+            <div class="field">
+              <span class="field-label">Frequency</span>
+              <div class="choice-row">
+                <label class="choice"><input type="radio" name="frequency" value="one_time" checked> One time</label>
+                <label class="choice"><input type="radio" name="frequency" value="biweekly"> Every 2 weeks</label>
+                <label class="choice"><input type="radio" name="frequency" value="weekly"> Weekly</label>
+                <label class="choice"><input type="radio" name="frequency" value="monthly"> Monthly</label>
+              </div>
+            </div>
+
+            <div class="field" data-when="commercial" hidden>
+              <span class="field-label">Services needed</span>
+              <div class="choice-row">
+                <label class="choice"><input type="checkbox" name="services" value="office_cleaning"> Bureaux</label>
+                <label class="choice"><input type="checkbox" name="services" value="common_areas"> Common areas</label>
+                <label class="choice"><input type="checkbox" name="services" value="post_construction"> Post-construction</label>
+                <label class="choice"><input type="checkbox" name="services" value="floor_stripping_waxing"> Floor stripping and waxing</label>
+                <label class="choice"><input type="checkbox" name="services" value="carpets"> Tapis</label>
+              </div>
+            </div>
+
+            <div class="field" data-when="residential">
+              <span class="field-label">Extras</span>
+              <div class="choice-row">
+                <label class="choice"><input type="checkbox" name="extras" value="fridge"> Inside the fridge</label>
+                <label class="choice"><input type="checkbox" name="extras" value="oven"> Inside the oven</label>
+                <label class="choice"><input type="checkbox" name="extras" value="windows"> Interior windows</label>
+              </div>
+            </div>
+
+            <div class="field-group">
+              <div class="field">
+                <label for="desired_start">Preferred start</label>
+                <input type="date" id="desired_start" name="desired_start">
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="access_notes">Access and constraints</label>
+              <textarea id="access_notes" name="access_notes" placeholder="Hours, parking, priority areas…"></textarea>
+            </div>
+
+            <div class="wizard-actions">
+              <button type="button" class="btn btn-ghost" data-prev="1">Back</button>
+              <button type="button" class="btn btn-primary" data-next="3">Continue</button>
+            </div>
+          </fieldset>
+
+          <!-- Step 3 -->
+          <fieldset class="wizard-step" data-step="3" hidden>
+            <div class="field-group">
+              <div class="field">
+                <label for="full_name">Full name *</label>
+                <input type="text" id="full_name" name="full_name" autocomplete="name" required>
+              </div>
+              <div class="field">
+                <label for="company">Company or condo board</label>
+                <input type="text" id="company" name="company" autocomplete="organization">
+              </div>
+              <div class="field">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" autocomplete="email">
+              </div>
+              <div class="field">
+                <label for="phone">Phone</label>
+                <input type="tel" id="phone" name="phone" autocomplete="tel">
+              </div>
+            </div>
+            <p class="note" style="margin-bottom:18px">An email or a phone number is enough. We use whichever you prefer.</p>
+
+            <label class="checkbox-row">
+              <input type="checkbox" name="consent_given" required>
+              <span>I agree that this information may be used to answer my request.</span>
+            </label>
+            <label class="hp" aria-hidden="true">Do not fill<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+
+            <div id="form-error" class="alert" hidden role="alert"></div>
+
+            <div class="wizard-actions">
+              <button type="button" class="btn btn-ghost" data-prev="2">Back</button>
+              <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">Send my request</button>
+            </div>
+          </fieldset>
+        </form>
+
+        <aside class="summary" id="summary">
+          <span class="field-label">Your estimate</span>
+          <div class="price" id="price-total">—</div>
+          <p class="note" id="price-note">Fill in the property and frequency: your price appears here.</p>
+          <div id="price-lines"></div>
+          <p class="note" id="price-disclaimer" hidden>Taxes extra. A firm price for a standard home.</p>
+          <hr>
+          <p class="note">A question? <a href="tel:+15142424779"><strong>514 242-4779</strong></a></p>
+        </aside>
+
       </div>
 
-      <!-- Step 1 -->
-      <fieldset class="wizard-step" data-step="1" style="border:0;padding:0;margin:0">
-        <div class="field">
-          <span class="field-label">Type of request</span>
-          <div class="choice-row" role="radiogroup">
-            <label class="choice"><input type="radio" name="audience" value="residential" checked> Residential</label>
-            <label class="choice"><input type="radio" name="audience" value="commercial"> Commercial</label>
-          </div>
+      <div id="done" hidden class="cta" style="margin-top:32px">
+        <div>
+          <h2 id="done-title"></h2>
+          <p id="done-ref" class="note" style="color:#c6d5ec;margin-top:10px"></p>
         </div>
-        <div class="field">
-          <label for="property_type">Property type</label>
-          <select id="property_type" name="property_type">
-            <option value="house">House</option>
-            <option value="condo">Condo</option>
-            <option value="apartment">Apartment</option>
-            <option value="office">Office</option>
-            <option value="retail">Retail</option>
-            <option value="building">Building</option>
-            <option value="industrial">Industrial</option>
-            <option value="construction">Construction site</option>
-          </select>
+        <div class="row">
+          <span class="price" id="done-price" hidden style="color:#fff"></span>
+          <a class="btn btn-gold" href="/en">Back à l'accueil</a>
         </div>
-        <div class="field">
-          <label for="area_sqft">Approximate area (sq ft)</label>
-          <input type="number" id="area_sqft" name="area_sqft" min="100" max="1000000" inputmode="numeric" placeholder="1200">
-        </div>
-        <div data-when="residential">
-          <div class="field"><label for="bedrooms">Bedrooms</label>
-            <select id="bedrooms" name="bedrooms"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>
-          <div class="field"><label for="bathrooms">Bathrooms</label>
-            <select id="bathrooms" name="bathrooms"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
-        </div>
-        <div data-when="commercial" hidden>
-          <div class="field"><label for="restrooms">Number of restrooms</label>
-            <input type="number" id="restrooms" name="restrooms" min="0" max="200" inputmode="numeric" placeholder="3"></div>
-          <div class="field"><label for="floors">Number of floors</label>
-            <input type="number" id="floors" name="floors" min="1" max="100" inputmode="numeric" placeholder="2"></div>
-          <label class="checkbox-row"><input type="checkbox" name="night_access"> Evening or night visits</label>
-        </div>
-        <button type="button" class="btn btn-primary" data-next="2">Continue</button>
-      </fieldset>
-
-      <!-- Step 2 -->
-      <fieldset class="wizard-step" data-step="2" hidden style="border:0;padding:0;margin:0">
-        <div class="field">
-          <span class="field-label">Frequency</span>
-          <div class="choice-row">
-            <label class="choice"><input type="radio" name="frequency" value="one_time" checked> One time</label>
-            <label class="choice"><input type="radio" name="frequency" value="biweekly"> Every 2 weeks</label>
-            <label class="choice"><input type="radio" name="frequency" value="weekly"> Weekly</label>
-            <label class="choice"><input type="radio" name="frequency" value="monthly"> Monthly</label>
-          </div>
-        </div>
-        <div class="field" data-when="commercial" hidden>
-          <span class="field-label">Services needed</span>
-          <div class="choice-row">
-            <label class="choice"><input type="checkbox" name="services" value="office_cleaning"> Offices</label>
-            <label class="choice"><input type="checkbox" name="services" value="common_areas"> Common areas</label>
-            <label class="choice"><input type="checkbox" name="services" value="post_construction"> Post-construction</label>
-            <label class="choice"><input type="checkbox" name="services" value="floor_stripping_waxing"> Floor stripping and waxing</label>
-            <label class="choice"><input type="checkbox" name="services" value="carpets"> Carpets</label>
-          </div>
-        </div>
-        <div class="field" data-when="residential">
-          <span class="field-label">Extras</span>
-          <div class="choice-row">
-            <label class="choice"><input type="checkbox" name="extras" value="fridge"> Inside the fridge</label>
-            <label class="choice"><input type="checkbox" name="extras" value="oven"> Inside the oven</label>
-            <label class="choice"><input type="checkbox" name="extras" value="windows"> Interior windows</label>
-          </div>
-        </div>
-        <div class="field"><label for="desired_start">Preferred start</label>
-          <input type="date" id="desired_start" name="desired_start"></div>
-        <div class="field"><label for="access_notes">Access and constraints</label>
-          <textarea id="access_notes" name="access_notes" placeholder="Hours, parking, priority areas…"></textarea></div>
-        <button type="button" class="btn btn-ghost" data-prev="1">Back</button>
-        <button type="button" class="btn btn-primary" data-next="3">Continue</button>
-      </fieldset>
-
-      <!-- Step 3 -->
-      <fieldset class="wizard-step" data-step="3" hidden style="border:0;padding:0;margin:0">
-        <div class="field"><label for="full_name">Full name *</label>
-          <input type="text" id="full_name" name="full_name" autocomplete="name" required></div>
-        <div class="field"><label for="company">Company or condo board</label>
-          <input type="text" id="company" name="company" autocomplete="organization"></div>
-        <div class="field"><label for="email">Email</label>
-          <input type="email" id="email" name="email" autocomplete="email"></div>
-        <div class="field"><label for="phone">Phone</label>
-          <input type="tel" id="phone" name="phone" autocomplete="tel"></div>
-        <p class="note">An email or a phone number is enough. We use whichever you prefer.</p>
-        <label class="checkbox-row"><input type="checkbox" name="consent_given" required>
-          I agree that this information may be used to answer my request.</label>
-        <label class="hp" aria-hidden="true">Do not fill<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
-        <div id="form-error" class="alert" hidden role="alert"></div>
-        <button type="button" class="btn btn-ghost" data-prev="2">Back</button>
-        <button type="submit" class="btn btn-primary" id="submit-btn">Send my request</button>
-      </fieldset>
-    </form>
-
-    <aside class="summary" id="summary">
-      <span class="field-label">Your estimate</span>
-      <div class="price" id="price-total">—</div>
-      <p class="note" id="price-note">Fill in the property and frequency: your price appears here.</p>
-      <div id="price-lines"></div>
-      <p class="note" id="price-disclaimer" hidden>Taxes extra. A firm price for a standard home.</p>
-    </aside>
-  </div>
-
-  <div id="done" hidden style="margin-top:32px" class="card card--highlight">
-    <h2 id="done-title"></h2>
-    <p id="done-price" class="price" hidden></p>
-    <p class="note" id="done-ref"></p>
-    <a class="btn btn-primary" href="/en" style="align-self:flex-start">Back à l'accueil</a>
-  </div>
+      </div>
+    </div>
+  </section>
 </main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-bottom" style="border:0;margin:0;padding:0">
+      <span>© 2026 Proline Cleaning Solutions · 514 242-4779</span>
+      <span><a href="/en">Home</a> · <a href="/en/commercial">Commercial</a> · <a href="/en/soumission">Français</a></span>
+    </div>
+  </div>
+</footer>
+
+<div class="callbar">
+  <a class="btn btn-ghost" href="tel:+15142424779">Call</a>
+  <a class="btn btn-primary" href="#quote-form">Open the form</a>
+</div>
 
 <script src="/js/quote.js"></script>
 </body>

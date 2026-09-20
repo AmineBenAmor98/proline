@@ -1,5 +1,11 @@
 # Local development: one command brings up Postgres, the schema, a rate card
 # and the site.   docker compose -f infra/docker-compose.yml up
+#
+# The project name is pinned: without it Docker names the project after this
+# file's folder ("infra"), which collides with every other project that keeps
+# its compose file in infra/ — they would share containers and volumes.
+name: proline
+
 services:
   db:
     image: postgres:16-alpine
@@ -44,3 +50,4 @@ services:
 
 volumes:
   pgdata:
+    name: proline_pgdata

@@ -33,9 +33,10 @@ async def test_quote_form_posts_to_the_real_endpoint(client):
     assert "/api/quotes" in script
 
 
-async def test_admin_page_is_not_indexed(client):
+async def test_admin_page_is_not_indexed_and_asks_to_sign_in(client):
     page = (await client.get("/admin")).text
     assert "noindex" in page
+    assert 'id="username"' in page and 'id="password"' in page
 
 
 async def test_french_and_english_pages_cross_link(client):

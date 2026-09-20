@@ -1,13 +1,13 @@
 # Proline — everyday commands. `make dev` is the one that matters.
-COMPOSE := docker compose -f infra/docker-compose.yml
+COMPOSE := docker compose -p proline -f infra/docker-compose.yml
 
 .PHONY: dev up down logs rebuild seed shell psql test lint
 
 dev: ## Postgres + schema + rate card + site on http://localhost:8000
-	$(COMPOSE) up --build
+	$(COMPOSE) up --build --remove-orphans
 
 up: ## Same, in the background
-	$(COMPOSE) up --build -d
+	$(COMPOSE) up --build -d --remove-orphans
 
 down: ## Stop everything (keeps the database volume)
 	$(COMPOSE) down

@@ -7,6 +7,17 @@ from pydantic import BaseModel
 from app.models.enums import Audience, Frequency, RequestStatus
 
 
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+class LoginOut(BaseModel):
+    token: str
+    username: str
+    expires_in: int
+
+
 class AdminRequestRow(BaseModel):
     id: str
     created_at: datetime

@@ -33,7 +33,7 @@ Other targets: `make test`, `make seed`, `make psql`, `make logs`, `make lint`.
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env            # then set ADMIN_TOKEN
+cp .env.example .env            # then set ADMIN_USERNAME, ADMIN_PASSWORD, SECRET_KEY
 
 # 3. Schema + a rate card so prices exist
 alembic upgrade head
@@ -47,7 +47,7 @@ uvicorn app.main:app --reload
 | --- | --- |
 | `/` `/commercial` `/soumission` | French site |
 | `/en` `/en/commercial` `/en/soumission` | English site |
-| `/admin` | Request list (asks for `ADMIN_TOKEN`) |
+| `/admin` | Sign-in (ADMIN_USERNAME / ADMIN_PASSWORD), then the request list |
 | `/api/quotes` `POST` | Submit a request |
 | `/api/quotes/price` `POST` | Live residential price |
 | `/api/admin/requests` | List / patch, Bearer token |
@@ -83,9 +83,12 @@ still recompute to what the client was given.
 
 - **The rate grid** in `scripts/seed_rate_card.py` — every number is invented. Replace it
   with Proline's real figures before any price is shown publicly.
-- **Admin auth** is a single shared `ADMIN_TOKEN`. Fine for one person; replace with real
-  auth before anyone else gets access.
-- **Photos, logo, review counts, email address** in the HTML, marked `[LIKE THIS]`.
+- **Admin auth** is one username and password from the environment, with a signed 12-hour
+  token. Fine for one person; replace with per-user accounts before anyone else gets access.
+  Local defaults: `admin` / `proline`.
+- **Photos, review counts, email address** in the HTML, marked `[LIKE THIS]`. The logo is a
+  350 px screenshot from Facebook; swap in the original file.
+- **English pages** are generated: edit the French page, then run `python3 frontend/build_en.py`.
 - **Notifications** are logged, not sent, until `RESEND_API_KEY` and the Twilio keys are set
   and `ENVIRONMENT` is not `local`.
 

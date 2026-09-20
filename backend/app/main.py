@@ -37,6 +37,7 @@ app = FastAPI(
 
 app.include_router(health.router)
 app.include_router(quotes.router, prefix="/api")
+app.include_router(admin.public_router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
 

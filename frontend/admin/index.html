@@ -4,43 +4,70 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Admin — Proline</title>
+<title>Admin — Proline Cleaning Solutions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Karla:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/css/app.css">
 </head>
-<body>
-<div class="goldbar"></div>
-<header class="site-header">
-  <div class="container" style="display:flex;align-items:center;gap:24px;width:100%">
-    <a class="brand" href="/"><img src="/img/logo.png" alt="Proline Cleaning Solutions" width="48" height="48">
-      <span><span class="brand-name">PROLINE</span><br><span class="brand-sub">Admin</span></span></a>
-    <nav class="site-nav">
-      <button class="btn btn-ghost" id="refresh-btn" type="button">Rafraîchir</button>
-      <button class="btn btn-ghost" id="logout-btn" type="button" hidden>Oublier le jeton</button>
-    </nav>
-  </div>
-</header>
+<body class="admin-body">
 
-<main class="container" style="padding:32px 0">
+<!-- Sign in -->
+<div class="login-screen" id="login">
+  <form class="login-card" id="login-form" novalidate>
+    <img src="/img/logo.png" alt="" width="64" height="64">
+    <div class="login-head">
+      <span class="brand-name">PROLINE</span>
+      <span class="brand-sub">Cleaning Solutions</span>
+    </div>
+    <h1>Espace admin</h1>
+    <p class="note">Connectez-vous pour voir les demandes de soumission.</p>
 
-  <section id="login" hidden>
-    <h1>Accès admin</h1>
-    <p class="lead" style="margin:12px 0 20px">Entrez le jeton d'administration (ADMIN_TOKEN). Il reste dans ce navigateur.</p>
-    <form id="login-form" style="max-width:420px">
-      <div class="field">
-        <label for="token">Jeton</label>
-        <input type="password" id="token" autocomplete="current-password" required>
-      </div>
-      <div id="login-error" class="alert" hidden role="alert"></div>
-      <button class="btn btn-primary" type="submit">Entrer</button>
-    </form>
-  </section>
+    <div class="field">
+      <label for="username">Nom d'utilisateur</label>
+      <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Mot de passe</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+    </div>
 
-  <section id="panel" hidden>
-    <h1>Demandes</h1>
+    <div id="login-error" class="alert" hidden role="alert"></div>
+    <button class="btn btn-primary btn-lg" type="submit" id="login-btn" style="width:100%">Se connecter</button>
+    <a class="note" href="/" style="text-align:center">← Retour au site</a>
+  </form>
+</div>
+
+<!-- Panel -->
+<div id="panel" hidden>
+  <div class="goldbar"></div>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/admin">
+        <img src="/img/logo.png" alt="">
+        <span class="brand-text">
+          <span class="brand-name">PROLINE</span>
+          <span class="brand-sub">Admin</span>
+        </span>
+      </a>
+      <nav class="site-nav">
+        <a class="navlink" href="/" target="_blank" rel="noopener">Voir le site</a>
+        <span class="lang" id="who"></span>
+        <button class="btn btn-ghost" id="refresh-btn" type="button">Rafraîchir</button>
+        <button class="btn btn-ghost" id="logout-btn" type="button">Déconnexion</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container admin-wrap">
+    <div class="section-head" style="margin-bottom:24px">
+      <span class="eyebrow">Demandes</span>
+      <h1 style="font-size:2rem">Boîte de réception</h1>
+    </div>
+
     <div class="stat-row" id="stats"></div>
 
-    <div class="choice-row" style="margin-bottom:18px">
+    <div class="choice-row" style="margin-bottom:20px" id="filters">
       <label class="choice"><input type="radio" name="status" value="" checked> Toutes</label>
       <label class="choice"><input type="radio" name="status" value="new"> Nouvelles</label>
       <label class="choice"><input type="radio" name="status" value="priced"> Chiffrées</label>
@@ -52,7 +79,7 @@
     <div id="panel-error" class="alert" hidden role="alert"></div>
     <p id="empty" class="note" hidden>Aucune demande pour ce filtre.</p>
 
-    <div style="overflow-x:auto">
+    <div class="table-wrap">
       <table class="admin-table" id="requests">
         <thead>
           <tr>
@@ -63,8 +90,9 @@
         <tbody></tbody>
       </table>
     </div>
-  </section>
-</main>
+    <p class="note" style="margin-top:14px">Le prix envoyé se sauvegarde quand vous quittez le champ. Le statut passe automatiquement à « Envoyée ».</p>
+  </main>
+</div>
 
 <script src="/js/admin.js"></script>
 </body>

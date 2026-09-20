@@ -13,8 +13,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://proline:proline@localhost:5432/proline"
     frontend_dir: str = ""
 
-    # Sprint 1 admin access: a shared token in the env. Replaced by real auth in sprint 4.
-    admin_token: str = ""
+    # Admin sign-in. Change these in .env before the site is public.
+    admin_username: str = "admin"
+    admin_password: str = "proline"
+    secret_key: str = "dev-secret-change-me"
 
     resend_api_key: str = ""
     notify_email_from: str = "soumissions@example.ca"

@@ -7,13 +7,39 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import require_admin
+from app.core.config import Settings, get_settings
+from app.core.security import TOKEN_TTL_SECONDS, check_credentials, create_token, require_admin
 from app.db.session import get_session
 from app.models import Lead, Property, Quote, QuoteRequest
 from app.models.enums import RequestStatus
-from app.schemas.admin import AdminRequestList, AdminRequestPatch, AdminRequestRow
+from app.schemas.admin import (
+    AdminRequestList,
+    AdminRequestPatch,
+    AdminRequestRow,
+    LoginIn,
+    LoginOut,
+)
 
+# Sign-in is public; everything else needs the token it returns.
+public_router = APIRouter(prefix="/admin", tags=["admin"])
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+
+
+@public_router.post("/login", response_model=LoginOut)
+async def login(payload: LoginIn, settings: Settings = Depends(get_settings)) -> LoginOut:
+    if not check_credentials(payload.username, payload.password, settings):
+        raise HTTPException(status_code=401, detail="identifiants invalides")
+    return LoginOut(
+        token=create_token(payload.username.strip(), settings),
+        username=payload.username.strip(),
+        expires_in=TOKEN_TTL_SECONDS,
+    )
+
+
+@router.get("/me")
+async def me(username: str = Depends(require_admin)) -> dict[str, str]:
+    """Lets the panel check a stored token before showing anything."""
+    return {"username": username}
 
 
 def _row(request: QuoteRequest, lead: Lead, prop: Property, quoted: int | None) -> AdminRequestRow:
