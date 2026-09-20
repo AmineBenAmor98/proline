@@ -33,10 +33,15 @@ async def test_quote_form_posts_to_the_real_endpoint(client):
     assert "/api/quotes" in script
 
 
-async def test_admin_page_is_not_indexed_and_asks_to_sign_in(client):
-    page = (await client.get("/admin")).text
-    assert "noindex" in page
-    assert 'id="username"' in page and 'id="password"' in page
+async def test_admin_pages_are_not_indexed_and_carry_no_data(client):
+    """The sign-in form is injected by admin-common.js, so it is not in the served
+    HTML. What must hold is that neither admin page is indexable and neither ships
+    a customer's details to an unauthenticated reader."""
+    for path in ("/admin", "/admin/tarifs"):
+        page = (await client.get(path)).text
+        assert "noindex" in page, path
+        assert "/js/admin-common.js" in page, path
+        assert "@" not in page.split("<body")[1], path
 
 
 async def test_french_and_english_pages_cross_link(client):

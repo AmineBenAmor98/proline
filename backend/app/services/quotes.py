@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Lead, Property, QuoteRequest
-from app.models.enums import RequestStatus
+from app.models.enums import Audience, RequestStatus
 from app.pricing import Breakdown, PricingInput, price_request
 from app.pricing.engine import PricingError
 from app.schemas.quote import PriceDraftIn, QuoteRequestIn
@@ -33,10 +33,18 @@ async def compute_price(
     session: AsyncSession, payload: QuoteRequestIn | PriceDraftIn
 ) -> tuple[Breakdown | None, str | None]:
     """Returns (breakdown, rate_card_id). Never raises on a missing grid: a request
-    without a price is still a lead, and a human prices it."""
+    without a price is still a lead, and a human prices it.
+
+    Two things deliberately produce no price for a residential request: the admin
+    has switched online pricing off, or the grid has no cell for that bedroom and
+    bathroom count. Both mean "we have not decided this price", and inventing one
+    is worse than saying a person will call.
+    """
     card = await get_active_rate_card(session)
     if card is None:
         return None, None
+    if payload.audience == Audience.residential and not card.residential_online_pricing:
+        return None, str(card.id)
     try:
         breakdown = price_request(_pricing_input(payload), to_pricing_data(card))
     except PricingError:

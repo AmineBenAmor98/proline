@@ -44,7 +44,12 @@
                      : "Indiquez une superficie approximative, même grossière.",
     areaRange: EN ? "Enter an area between 100 and 1,000,000 sq ft."
                   : "Entrez une superficie entre 100 et 1 000 000 pi².",
-    quotedIn24: EN ? "Quoted within 24 h" : "Chiffré sous 24 h"
+    quotedIn24: EN ? "Quoted within 24 h" : "Chiffré sous 24 h",
+    /* 409: the grid has no cell for this home, or the admin has switched online
+       pricing off. Both mean a person decides the price, which is not an error. */
+    byHand: EN ? "We price this one by hand. Send the request and you have it within 24 hours."
+               : "Celle-ci est chiffrée à la main. Envoyez la demande : vous l'avez sous 24 h.",
+    byHandShort: EN ? "Priced by hand" : "Chiffré à la main"
   };
 
   /* Price lines arrive in both languages; render the one this page is written in. */
@@ -258,14 +263,14 @@
     };
   }
 
-  function clearPrice(message) {
+  function clearPrice(message, barText) {
     /* No dash pretending to be a price: for commercial there is no number to show. */
     priceTotal.hidden = true;
     priceTotal.textContent = "";
     priceLines.innerHTML = "";
     priceDisclaimer.hidden = true;
     priceNote.textContent = message;
-    setBar(audience() === "commercial" ? T.quotedIn24 : T.chooseTypeShort, false);
+    setBar(barText || (audience() === "commercial" ? T.quotedIn24 : T.chooseTypeShort), false);
   }
 
   var priceTimer = null;
@@ -302,7 +307,10 @@
           }
           priceDisclaimer.hidden = false;
         })
-        .catch(function () { clearPrice(T.fillIn); });
+        .catch(function (status) {
+          if (status === 409) clearPrice(T.byHand, T.byHandShort);
+          else clearPrice(T.fillIn);
+        });
     }, 350);
   }
 

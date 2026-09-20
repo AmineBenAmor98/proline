@@ -18,6 +18,13 @@ class RateCard(TimestampedBase):
     effective_to: Mapped[date | None] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # The one field here that IS edited in place: it is not a price, so flipping it
+    # cannot change what an already-sent quote recomputes to. Off means residential
+    # requests are quoted by a human, like commercial.
+    residential_online_pricing: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true", nullable=False
+    )
+
     # All money in cents, CAD.
     hourly_rate_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     minimum_visit_cents: Mapped[int] = mapped_column(Integer, nullable=False)

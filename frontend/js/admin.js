@@ -1,22 +1,14 @@
-/* Proline admin.
- * Sign in with username and password, then one screen: the request list, with an
- * editable sent price. The token from /api/admin/login is kept in localStorage
- * and expires after 12 hours.
+/* The requests screen: one list, with an editable sent price and a status.
+ * Session, sign-in and formatting live in admin-common.js, shared with /admin/tarifs.
  */
 (function () {
   "use strict";
 
-  var KEY = "proline_admin_session";
-  var login = document.getElementById("login");
-  var panel = document.getElementById("panel");
-  var loginForm = document.getElementById("login-form");
-  var loginBtn = document.getElementById("login-btn");
-  var loginError = document.getElementById("login-error");
+  var A = window.ProlineAdmin;
   var panelError = document.getElementById("panel-error");
   var tbody = document.querySelector("#requests tbody");
   var stats = document.getElementById("stats");
   var empty = document.getElementById("empty");
-  var who = document.getElementById("who");
 
   var STATUS_LABELS = {
     new: "Nouvelle", enriching: "Analyse", priced: "Chiffrée",
@@ -33,69 +25,6 @@
     retail: "Commerce", building: "Immeuble", industrial: "Industriel",
     construction: "Chantier"
   };
-
-  function session() {
-    try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; }
-  }
-  function setSession(value) {
-    try {
-      if (value) localStorage.setItem(KEY, JSON.stringify(value));
-      else localStorage.removeItem(KEY);
-    } catch (e) { /* private mode */ }
-  }
-
-  function money(cents) {
-    if (cents === null || cents === undefined) return "—";
-    return new Intl.NumberFormat("fr-CA", {
-      style: "currency", currency: "CAD", maximumFractionDigits: 0
-    }).format(cents / 100);
-  }
-
-  function when(iso) {
-    return new Date(iso).toLocaleString("fr-CA", {
-      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit"
-    });
-  }
-
-  function esc(value) {
-    return String(value === null || value === undefined ? "" : value)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  }
-
-  function api(path, options) {
-    var current = session();
-    options = options || {};
-    options.headers = Object.assign(
-      { "Content-Type": "application/json" },
-      current ? { Authorization: "Bearer " + current.token } : {},
-      options.headers || {}
-    );
-    return fetch("/api/admin" + path, options).then(function (res) {
-      if (res.status === 401) {
-        setSession(null);
-        showLogin("Session expirée. Reconnectez-vous.");
-        return Promise.reject("auth");
-      }
-      if (!res.ok) return Promise.reject(res.status);
-      return res.json();
-    });
-  }
-
-  function showLogin(message) {
-    login.hidden = false;
-    panel.hidden = true;
-    document.body.classList.add("admin-body");
-    if (message) { loginError.textContent = message; loginError.hidden = false; }
-    else loginError.hidden = true;
-  }
-
-  function showPanel(username) {
-    login.hidden = true;
-    panel.hidden = false;
-    document.body.classList.remove("admin-body");
-    who.textContent = username ? "Connecté : " + username : "";
-  }
 
   function currentStatus() {
     var el = document.querySelector('input[name="status"]:checked');
@@ -115,14 +44,14 @@
     if (row.bathrooms) parts.push(row.bathrooms + " sdb");
     if (row.restrooms) parts.push(row.restrooms + " sanit.");
     var city = row.borough || row.city;
-    return esc(parts.join(" · ")) + (city ? '<br><span class="note">' + esc(city) + "</span>" : "");
+    return A.esc(parts.join(" · ")) + (city ? '<br><span class="note">' + A.esc(city) + "</span>" : "");
   }
 
   function contactCell(row) {
-    var lines = ["<strong>" + esc(row.full_name) + "</strong>"];
-    if (row.company) lines.push(esc(row.company));
-    if (row.phone) lines.push('<a href="tel:' + esc(row.phone) + '">' + esc(row.phone) + "</a>");
-    if (row.email) lines.push('<a href="mailto:' + esc(row.email) + '">' + esc(row.email) + "</a>");
+    var lines = ["<strong>" + A.esc(row.full_name) + "</strong>"];
+    if (row.company) lines.push(A.esc(row.company));
+    if (row.phone) lines.push('<a href="tel:' + A.esc(row.phone) + '">' + A.esc(row.phone) + "</a>");
+    if (row.email) lines.push('<a href="mailto:' + A.esc(row.email) + '">' + A.esc(row.email) + "</a>");
     return lines.join("<br>");
   }
 
@@ -133,21 +62,21 @@
       tiles.push({ label: STATUS_LABELS[key] || key, value: counts[key] });
     });
     stats.innerHTML = tiles.map(function (t) {
-      return '<div class="stat"><b>' + t.value + "</b><span>" + esc(t.label) + "</span></div>";
+      return '<div class="stat"><b>' + t.value + "</b><span>" + A.esc(t.label) + "</span></div>";
     }).join("");
 
     empty.hidden = data.items.length > 0;
     tbody.innerHTML = data.items.map(function (row) {
       var quoted = row.quoted_total_cents;
       return '<tr data-id="' + row.id + '">' +
-        "<td>" + when(row.created_at) + "</td>" +
+        "<td>" + A.when(row.created_at) + "</td>" +
         "<td>" + contactCell(row) + "</td>" +
         "<td>" + propertyCell(row) + "</td>" +
-        "<td>" + esc((row.audience === "residential" ? "Résidentiel" : "Commercial") + " · " +
+        "<td>" + A.esc((row.audience === "residential" ? "Résidentiel" : "Commercial") + " · " +
           (FREQUENCY_LABELS[row.frequency] || row.frequency)) +
-          (row.access_notes ? '<br><span class="note">' + esc(row.access_notes.slice(0, 70)) + "</span>" : "") +
+          (row.access_notes ? '<br><span class="note">' + A.esc(row.access_notes.slice(0, 70)) + "</span>" : "") +
         "</td>" +
-        "<td>" + money(row.computed_total_cents) + "</td>" +
+        "<td>" + A.money(row.computed_total_cents) + "</td>" +
         '<td><input type="number" class="quoted" style="width:118px" placeholder="$" value="' +
           (quoted !== null && quoted !== undefined ? quoted / 100 : "") + '"></td>' +
         "<td>" + statusChip(row.status) +
@@ -156,7 +85,7 @@
             return '<option value="' + s + '"' + (s === row.status ? " selected" : "") + ">" +
               STATUS_LABELS[s] + "</option>";
           }).join("") + "</select></td>" +
-        "<td>" + esc(row.utm_campaign || (row.gclid ? "Google Ads" : "direct")) + "</td>" +
+        "<td>" + A.esc(row.utm_campaign || (row.gclid ? "Google Ads" : "direct")) + "</td>" +
         "</tr>";
     }).join("");
   }
@@ -164,25 +93,21 @@
   function load() {
     panelError.hidden = true;
     var status = currentStatus();
-    api("/requests" + (status ? "?status=" + status : ""))
-      .then(function (data) {
-        var current = session();
-        showPanel(current && current.username);
-        render(data);
-      })
+    A.api("/requests" + (status ? "?status=" + status : ""))
+      .then(render)
       .catch(function (err) {
         if (err === "auth") return;
-        panelError.textContent = "Chargement impossible (" + err + ").";
+        panelError.textContent = "Chargement impossible : " + A.apiMessage(err);
         panelError.hidden = false;
       });
   }
 
   function patch(id, body) {
-    return api("/requests/" + id, { method: "PATCH", body: JSON.stringify(body) })
+    return A.api("/requests/" + id, { method: "PATCH", body: JSON.stringify(body) })
       .then(load)
       .catch(function (err) {
         if (err === "auth") return;
-        panelError.textContent = "Enregistrement impossible (" + err + ").";
+        panelError.textContent = "Enregistrement impossible : " + A.apiMessage(err);
         panelError.hidden = false;
       });
   }
@@ -203,49 +128,7 @@
   document.querySelectorAll('input[name="status"]').forEach(function (el) {
     el.addEventListener("change", load);
   });
-
-  loginForm.addEventListener("submit", function (event) {
-    event.preventDefault();
-    loginError.hidden = true;
-    loginBtn.disabled = true;
-    loginBtn.textContent = "Connexion…";
-
-    fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: document.getElementById("username").value,
-        password: document.getElementById("password").value
-      })
-    })
-      .then(function (res) {
-        if (res.status === 401) return Promise.reject("bad");
-        if (!res.ok) return Promise.reject(res.status);
-        return res.json();
-      })
-      .then(function (data) {
-        setSession({ token: data.token, username: data.username });
-        document.getElementById("password").value = "";
-        load();
-      })
-      .catch(function (err) {
-        loginError.textContent = err === "bad"
-          ? "Nom d'utilisateur ou mot de passe incorrect."
-          : "Connexion impossible (" + err + ").";
-        loginError.hidden = false;
-      })
-      .then(function () {
-        loginBtn.disabled = false;
-        loginBtn.textContent = "Se connecter";
-      });
-  });
-
   document.getElementById("refresh-btn").addEventListener("click", load);
-  document.getElementById("logout-btn").addEventListener("click", function () {
-    setSession(null);
-    showLogin("");
-  });
 
-  if (session()) load();
-  else showLogin("");
+  A.boot({ onAuthed: load });
 })();

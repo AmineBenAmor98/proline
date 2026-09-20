@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Tarifs — Proline Cleaning Solutions</title>
+<link rel="icon" href="/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Karla:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="admin-body">
+
+<div id="panel" hidden>
+  <div class="goldbar"></div>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/admin">
+        <img src="/img/logo.png" alt="" width="42" height="42">
+        <span class="brand-text">
+          <span class="brand-name">PROLINE</span>
+          <span class="brand-sub">Admin</span>
+        </span>
+      </a>
+      <nav class="site-nav">
+        <a class="navlink" href="/admin">Demandes</a>
+        <a class="navlink" href="/admin/tarifs" aria-current="page">Tarifs</a>
+        <a class="navlink" href="/" target="_blank" rel="noopener">Voir le site</a>
+        <span class="lang" id="who"></span>
+        <button class="btn btn-ghost" id="logout-btn" type="button">Déconnexion</button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="draftbar" id="draftbar" hidden>
+    <div class="container">
+      <div class="draftbar-grow">
+        <span class="draftbar-title" id="draft-title">Brouillon</span>
+        <span class="note" id="draft-base"></span>
+      </div>
+      <span class="chip chip--quoted" id="draft-count" hidden></span>
+      <button class="btn btn-ghost" type="button" id="discard-btn" hidden>Annuler</button>
+      <button class="btn btn-primary" type="button" id="publish-btn" disabled>Réviser et publier</button>
+    </div>
+  </div>
+
+  <main class="container admin-wrap">
+    <div class="section-head" style="margin-bottom:22px">
+      <span class="eyebrow">Tarifs</span>
+      <h1 style="font-size:2rem">La grille qui chiffre chaque demande.</h1>
+      <p class="lead">Publier crée une nouvelle version. Les demandes déjà chiffrées gardent la leur.</p>
+    </div>
+
+    <div id="page-error" class="alert" hidden role="alert"></div>
+    <p class="note" id="loading">Chargement de la carte active…</p>
+
+    <div id="editor" hidden>
+      <div class="rate-box killrow">
+        <div>
+          <h2 style="font-size:0.94rem;margin:0">Prix en ligne pour le résidentiel</h2>
+          <p class="note" id="kill-note" style="margin:4px 0 0"></p>
+        </div>
+        <button type="button" class="switch" id="kill-switch" role="switch" aria-checked="true" aria-label="Prix en ligne pour le résidentiel"></button>
+      </div>
+
+      <div class="rate-layout">
+        <div>
+          <div class="rate-box">
+            <h2>Résidentiel — prix de base</h2>
+            <p class="note">Prix ferme affiché au client, par visite, taxes en sus. Une case vide n'est pas offerte en ligne : la demande est chiffrée à la main.</p>
+            <div style="overflow-x:auto">
+              <table class="grid-matrix" id="matrix"></table>
+            </div>
+            <div id="matrix-warnings"></div>
+          </div>
+
+          <div class="rate-box">
+            <h2>Résidentiel — superficie</h2>
+            <div class="pair-row">
+              <div><label for="f-allowance">Superficie incluse</label><p class="note">Au-delà, le supplément s'applique.</p></div>
+              <input id="f-allowance" data-kind="int" data-unit=" pi²" inputmode="numeric">
+            </div>
+            <div class="pair-row">
+              <div><label for="f-area">Supplément par 100 pi²</label><p class="note">Chaque tranche entamée est facturée.</p></div>
+              <input id="f-area" data-kind="money" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="rate-box">
+            <h2>Commercial — cadences</h2>
+            <p class="note">Jamais montré au client : sert à préparer votre soumission écrite.</p>
+            <div class="pair-row">
+              <div><label for="f-hourly">Taux horaire</label><p class="note">Coût chargé × votre marge.</p></div>
+              <input id="f-hourly" data-kind="money" inputmode="decimal">
+            </div>
+            <div id="minutes-rows"></div>
+            <div class="pair-row">
+              <div><label for="f-restroom">Par sanitaire</label><p class="note">Par pièce, pas par cuvette.</p></div>
+              <input id="f-restroom" data-kind="int" data-unit=" min" inputmode="numeric">
+            </div>
+            <div class="pair-row">
+              <div><label for="f-night">Majoration de soir ou de nuit</label><p class="note">Appliquée au total des minutes.</p></div>
+              <input id="f-night" data-kind="decimal" data-prefix="× " inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="rate-box">
+            <h2>Minimum et déplacement</h2>
+            <div class="pair-row">
+              <div><label for="f-minimum">Visite minimum</label><p class="note">Aucune visite n'est facturée sous ce montant.</p></div>
+              <input id="f-minimum" data-kind="money" inputmode="decimal">
+            </div>
+            <div class="pair-row">
+              <div><label for="f-travel">Déplacement</label><p class="note">Ajouté au commercial seulement.</p></div>
+              <input id="f-travel" data-kind="money" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="rate-box">
+            <h2>Extras et fréquence</h2>
+            <div id="extras-rows"></div>
+            <div id="discount-rows"></div>
+          </div>
+
+          <div class="rate-box">
+            <h2>Versions publiées</h2>
+            <div id="history"><p class="note">…</p></div>
+          </div>
+        </div>
+
+        <aside class="tester" id="tester">
+          <span class="field-label">Effet du brouillon</span>
+          <p class="note" style="margin:6px 0 16px">Chaque scénario est chiffré avec la carte active, puis avec votre brouillon.</p>
+          <div id="scenarios"></div>
+          <hr style="border:0;border-top:1px solid var(--line);margin:18px 0 6px">
+          <div id="tester-result"><p class="note">…</p></div>
+        </aside>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Review and publish -->
+<div class="modal" id="review" hidden>
+  <div class="modal-card">
+    <h2 style="font-size:1.25rem">Réviser et publier</h2>
+    <p class="note" id="review-intro"></p>
+    <div id="review-changes"></div>
+    <div id="review-effect"></div>
+    <div id="review-error" class="alert" hidden role="alert"></div>
+    <div class="row" style="margin-top:20px;justify-content:flex-end">
+      <button class="btn btn-ghost" type="button" id="review-cancel">Retour</button>
+      <button class="btn btn-primary" type="button" id="review-confirm">Publier cette version</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/admin-common.js"></script>
+<script src="/js/rates.js"></script>
+</body>
+</html>

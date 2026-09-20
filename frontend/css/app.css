@@ -484,6 +484,137 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 
 .admin-body { background: var(--cream); }
 
+/* ---------- rate card screen ---------- */
+
+.rate-layout { display: grid; gap: 26px; grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 1080px) {
+  .rate-layout { grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.85fr); gap: 32px; }
+}
+.rate-box {
+  background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 22px 24px; box-shadow: var(--shadow-sm); margin-bottom: 18px;
+}
+.rate-box > h2 { font-size: 1.06rem; margin-bottom: 4px; }
+.rate-box > .note { margin-bottom: 16px; }
+
+.grid-matrix { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 460px; }
+.grid-matrix th {
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
+  font-weight: 600; padding: 0 8px 9px; text-align: center;
+}
+.grid-matrix th:first-child { text-align: left; }
+.grid-matrix td { padding: 4px; }
+.grid-matrix td:first-child { font-weight: 600; white-space: nowrap; padding-right: 12px; }
+.cell { position: relative; }
+.cell input { width: 100%; min-height: 40px; text-align: right; padding: 6px 26px 6px 10px; font-size: 0.88rem; }
+.cell input.bad { border-color: var(--danger); }
+.cell.changed input { border-color: var(--navy); }
+.cell-remove {
+  position: absolute; right: 8px; top: 12px; width: 17px; height: 17px; line-height: 15px;
+  border: 0; border-radius: 50%; background: transparent; color: var(--muted);
+  cursor: pointer; font-size: 0.94rem; padding: 0; opacity: 0;
+  transition: opacity var(--t), color var(--t);
+}
+.cell:hover .cell-remove, .cell input:focus + .cell-remove { opacity: 1; }
+.cell-remove:hover { color: var(--danger); }
+.was { display: block; font-size: 0.68rem; color: var(--muted); text-align: right; margin-top: 3px; }
+.cell.empty button {
+  width: 100%; min-height: 40px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm);
+  background: transparent; color: var(--muted); font-size: 0.75rem; cursor: pointer;
+  font-family: inherit; transition: border-color var(--t), color var(--t);
+}
+.cell.empty button:hover { border-color: var(--navy); color: var(--navy); }
+
+.pair-row {
+  display: grid; grid-template-columns: 1fr 132px; gap: 14px; align-items: center;
+  padding: 11px 0; border-bottom: 1px solid var(--line-soft);
+}
+.pair-row:last-child { border-bottom: 0; }
+.pair-row label { font-size: 0.88rem; font-weight: 500; color: var(--ink); }
+.pair-row .note { font-size: 0.75rem; margin-top: 2px; }
+.pair-row input { min-height: 40px; text-align: right; font-size: 0.88rem; padding: 6px 10px; }
+.pair-row input.bad { border-color: var(--danger); }
+.derived { color: var(--gold-ink); font-weight: 600; }
+
+.draftbar {
+  position: sticky; top: 0; z-index: 20; background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--line);
+}
+.draftbar .container { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-block: 12px; }
+.draftbar-grow { flex: 1 1 auto; min-width: 200px; }
+.draftbar-title { font-family: var(--font-display); font-weight: 700; color: var(--navy); font-size: 0.94rem; margin-right: 8px; }
+
+.tester {
+  position: sticky; top: 84px; background: #fff; border: 1px solid var(--navy);
+  border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow);
+}
+.scenario {
+  border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px;
+  margin-bottom: 9px; cursor: pointer; transition: border-color var(--t), background var(--t);
+}
+.scenario:hover { border-color: var(--line-strong); }
+.scenario.on { border-color: var(--navy); background: var(--cream); }
+.scenario b { display: block; font-size: 0.88rem; }
+.scenario span { font-size: 0.75rem; color: var(--muted); }
+.delta {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 0.88rem;
+}
+.delta:last-of-type { border-bottom: 0; }
+.delta b { font-family: var(--font-display); font-size: 1.25rem; color: var(--navy); }
+.up { color: var(--ok); font-weight: 600; font-size: 0.82rem; }
+.down { color: var(--danger); font-weight: 600; font-size: 0.82rem; }
+
+.warnbox {
+  border: 1px solid #fecdc9; background: #fef3f2; color: var(--danger);
+  border-radius: var(--radius-sm); padding: 11px 13px; font-size: 0.82rem; margin-top: 14px; line-height: 1.5;
+}
+.warnbox.amber { border-color: #f5d9a8; background: #fff6e5; color: var(--gold-ink); }
+
+.killrow { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; }
+.switch {
+  width: 48px; height: 28px; border-radius: var(--pill); border: 0; padding: 0; flex: none;
+  background: var(--line-strong); position: relative; cursor: pointer; transition: background var(--t);
+}
+.switch[aria-checked="true"] { background: var(--ok); }
+.switch::after {
+  content: ""; position: absolute; left: 3px; top: 3px; width: 22px; height: 22px;
+  border-radius: 50%; background: #fff; transition: transform var(--t);
+}
+.switch[aria-checked="true"]::after { transform: translateX(20px); }
+
+.histrow {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 0; border-bottom: 1px solid var(--line-soft); font-size: 0.88rem;
+}
+.histrow:last-child { border-bottom: 0; }
+
+.modal {
+  position: fixed; inset: 0; z-index: 50; background: rgba(15, 23, 40, 0.45);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  overflow-y: auto;
+}
+.modal[hidden] { display: none; }
+.modal-card {
+  background: #fff; border-radius: var(--radius); padding: 28px; max-width: 620px; width: 100%;
+  box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto;
+}
+.review-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 10px; }
+.review-table td { padding: 8px 6px; border-bottom: 1px solid var(--line-soft); }
+.review-table .from { color: var(--muted); text-align: right; }
+.review-table .arrow { color: var(--muted); width: 22px; text-align: center; }
+.review-table .to { font-weight: 600; color: var(--navy); text-align: right; white-space: nowrap; }
+.review-table .to.big { color: var(--gold-ink); }
+
+/* Editing a price matrix on a phone invites the decimal slip this screen exists to
+   prevent. Below the two-column breakpoint it reads; the kill switch still works. */
+@media (max-width: 879px) {
+  .rate-box input, .grid-matrix input { pointer-events: none; background: var(--surface-soft); }
+  .cell.empty button, .cell-remove { display: none; }
+  .draftbar #publish-btn, .draftbar #discard-btn { display: none; }
+  .rate-box.killrow input { pointer-events: auto; }
+}
+
 .login-screen {
   min-height: 100dvh; display: grid; place-items: center; padding: 32px 20px;
   background:

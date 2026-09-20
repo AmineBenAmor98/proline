@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging, logger
-from app.routers import admin, health, quotes
+from app.routers import admin, health, quotes, rate_cards
 
 settings = get_settings()
 
@@ -54,6 +54,7 @@ app.include_router(health.router)
 app.include_router(quotes.router, prefix="/api")
 app.include_router(admin.public_router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(rate_cards.router, prefix="/api")
 
 
 FRONTEND_DIR = Path(
@@ -86,6 +87,9 @@ if FRONTEND_DIR.is_dir():
     admin_index = FRONTEND_DIR / "admin" / "index.html"
     if admin_index.is_file():
         _register_page("/admin", admin_index)
+    admin_rates = FRONTEND_DIR / "admin" / "tarifs.html"
+    if admin_rates.is_file():
+        _register_page("/admin/tarifs", admin_rates)
 
     # Mounted last so it never shadows the routes above.
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

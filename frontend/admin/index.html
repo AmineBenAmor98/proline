@@ -12,32 +12,6 @@
 </head>
 <body class="admin-body">
 
-<!-- Sign in -->
-<div class="login-screen" id="login">
-  <form class="login-card" id="login-form" novalidate>
-    <img src="/img/logo.png" alt="" width="64" height="64">
-    <div class="login-head">
-      <span class="brand-name">PROLINE</span>
-      <span class="brand-sub">Cleaning Solutions</span>
-    </div>
-    <h1>Espace admin</h1>
-    <p class="note">Connectez-vous pour voir les demandes de soumission.</p>
-
-    <div class="field">
-      <label for="username">Nom d'utilisateur</label>
-      <input type="text" id="username" name="username" autocomplete="username" required autofocus>
-    </div>
-    <div class="field">
-      <label for="password">Mot de passe</label>
-      <input type="password" id="password" name="password" autocomplete="current-password" required>
-    </div>
-
-    <div id="login-error" class="alert" hidden role="alert"></div>
-    <button class="btn btn-primary btn-lg" type="submit" id="login-btn" style="width:100%">Se connecter</button>
-    <a class="note" href="/" style="text-align:center">← Retour au site</a>
-  </form>
-</div>
-
 <!-- Panel -->
 <div id="panel" hidden>
   <div class="goldbar"></div>
@@ -51,6 +25,8 @@
         </span>
       </a>
       <nav class="site-nav">
+        <a class="navlink" href="/admin" aria-current="page">Demandes</a>
+        <a class="navlink" href="/admin/tarifs">Tarifs</a>
         <a class="navlink" href="/" target="_blank" rel="noopener">Voir le site</a>
         <span class="lang" id="who"></span>
         <button class="btn btn-ghost" id="refresh-btn" type="button">Rafraîchir</button>
@@ -94,6 +70,7 @@
   </main>
 </div>
 
+<script src="/js/admin-common.js"></script>
 <script src="/js/admin.js"></script>
 </body>
 </html>
