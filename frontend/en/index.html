@@ -9,6 +9,15 @@
 <link rel="alternate" hreflang="fr-ca" href="https://prolinesolutions.ca/">
 <link rel="alternate" hreflang="en-ca" href="https://prolinesolutions.ca/en">
 <link rel="icon" href="/img/logo.png">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_CA">
+<meta property="og:title" content="Proline Cleaning Solutions — Entretien ménager, Grand Montréal">
+<meta property="og:description" content="An online price for homes, a written quote within 24 hours for businesses.">
+<meta property="og:image" content="https://prolinesolutions.ca/img/og-share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="628">
+<meta property="og:url" content="https://prolinesolutions.ca/en">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Karla:wght@400;500;600&display=swap">
@@ -26,7 +35,7 @@
 <header class="site-header">
   <div class="container">
     <a class="brand" href="/en">
-      <img src="/img/logo.png" alt="">
+      <img src="/img/logo.png" alt="" width="42" height="42">
       <span class="brand-text">
         <span class="brand-name">PROLINE</span>
         <span class="brand-sub">Cleaning Solutions</span>
@@ -64,7 +73,13 @@
             </a>
           </div>
         </div>
-        <div class="photo photo--wide"><span>[PHOTO — the Proline team at work]</span></div>
+        <div class="photo">
+          <img src="/img/hero-residential-sq.jpg"
+               srcset="/img/hero-residential-sq-800.jpg 800w, /img/hero-residential-sq.jpg 1400w"
+               sizes="(min-width: 880px) 46vw, 100vw"
+               width="1400" height="1400" fetchpriority="high"
+               alt="Salon d'un condo montréalais fraîchement nettoyé, plancher de bois et comptoir de quartz">
+        </div>
       </div>
     </div>
   </section>
@@ -77,11 +92,11 @@
           Insured and bonded
         </span>
         <span class="trust-item">
-          <span class="trust-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M7 20V9l5-5 5 5v11"/></svg></span>
+          <span class="trust-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18v12H3z"/><path d="M3 8l2-4h14l2 4"/><path d="M12 8v12"/></svg></span>
           Products and equipment supplied
         </span>
         <span class="trust-item">
-          <span class="trust-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <span class="trust-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
           Satisfaction guaranteed or we come back
         </span>
         <span class="trust-item">
@@ -123,18 +138,67 @@
           <p>Turnover cleaning between two tenants.</p>
           <span class="tag">Online price</span>
         </div>
-        <div class="card">
+        <a class="card" href="/en/commercial#apres-travaux">
           <span class="icon-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M5 7l3 3M19 7l-3 3"/><path d="M4 12h16v9H4z"/></svg></span>
           <h3>Post-construction</h3>
           <p>Fine dust, residue, windows and finishing before handover.</p>
-          <span class="tag">Quote in 24h</span>
-        </div>
-        <div class="card card--feature">
+          <span class="tag">See how we do it →</span>
+        </a>
+        <a class="card card--feature" href="#decapage">
           <span class="icon-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M6 20V9h12v11"/><path d="M9 14h6"/></svg></span>
           <h3>Floor stripping and waxing</h3>
           <p>Stripping, sealing and waxing for vinyl, terrazzo and concrete.</p>
-          <span class="tag">Proline specialty</span>
+          <span class="tag">Proline specialty →</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section id="decapage">
+    <div class="container">
+      <div class="grid-2 lean">
+        <div class="photo photo--wide" style="order:1">
+          <img src="/img/floor-waxing.jpg"
+               srcset="/img/floor-waxing-800.jpg 800w, /img/floor-waxing.jpg 1600w"
+               sizes="(min-width: 880px) 46vw, 100vw"
+               width="1600" height="1000" loading="lazy"
+               alt="A floor burnisher at work on freshly waxed terrazzo">
         </div>
+        <div class="stack" style="order:2">
+          <span class="eyebrow">Proline specialty</span>
+          <h2>Floors that look new, not just clean.</h2>
+          <p class="lead">Full stripping, sealer and wax for vinyl, terrazzo and concrete. The finish comes back, and it lasts: hallways, entrances, common rooms and sales floors.</p>
+          <ul class="tick-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Stripping of worn wax layers</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Sealer and two to four coats of finish</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>High-speed burnishing, an even result</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Scheduled outside your opening hours</li>
+          </ul>
+          <a class="btn btn-primary btn-lg" href="/en/soumission?audience=commercial" style="align-self:flex-start">Request a quote</a>
+        </div>
+      </div>
+
+      <div class="ba">
+        <figure>
+          <div class="photo">
+            <img src="/img/decapage-avant.jpg"
+                 srcset="/img/decapage-avant-600.jpg 600w, /img/decapage-avant-900.jpg 900w, /img/decapage-avant.jpg 1200w"
+                 sizes="(min-width: 720px) 46vw, 100vw"
+                 width="1200" height="900" loading="lazy"
+                 alt="A vinyl tile corridor before stripping: scratches, heel marks and a dull finish">
+          </div>
+          <figcaption><span class="ba-tag">Before</span> Worn finish, scratches and heel marks.</figcaption>
+        </figure>
+        <figure>
+          <div class="photo">
+            <img src="/img/decapage-apres.jpg"
+                 srcset="/img/decapage-apres-600.jpg 600w, /img/decapage-apres-900.jpg 900w, /img/decapage-apres.jpg 1200w"
+                 sizes="(min-width: 720px) 46vw, 100vw"
+                 width="1200" height="900" loading="lazy"
+                 alt="The same corridor after stripping and waxing: the light fixtures reflect in the floor">
+          </div>
+          <figcaption><span class="ba-tag ba-tag--after">After</span> The same corridor, stripped, sealed and waxed.</figcaption>
+        </figure>
       </div>
     </div>
   </section>
@@ -197,6 +261,34 @@
     </div>
   </section>
 
+  <div class="band band-cream" id="equipe">
+    <section>
+      <div class="container">
+        <div class="grid-2 lean">
+          <div class="stack">
+            <span class="eyebrow">The crew</span>
+            <h2>The same faces, week after week.</h2>
+            <p class="lead">A crew assigned to your address, who know the place, your instructions and your hours. Not someone new to train every month.</p>
+            <ul class="tick-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Uniformed staff, identifiable on arrival</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Your access instructions and priorities kept on file</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Planned cover when someone is away</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>A supervisor you reach directly, not a call centre</li>
+            </ul>
+            <a class="btn btn-ghost btn-lg" href="tel:+15142424779" style="align-self:flex-start">Talk to a supervisor</a>
+          </div>
+          <div class="photo photo--wide">
+            <img src="/img/equipe.jpg"
+                 srcset="/img/equipe-800.jpg 800w, /img/equipe.jpg 1600w"
+                 sizes="(min-width: 880px) 46vw, 100vw"
+                 width="1600" height="1000" loading="lazy"
+                 alt="Two Proline staff in navy uniforms crossing an office lobby with their cart and supplies">
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <section>
     <div class="container">
       <div class="cta">
@@ -218,7 +310,7 @@
     <div class="footer-grid">
       <div class="footer-col">
         <a class="brand" href="/en" style="margin-bottom:6px">
-          <img src="/img/logo.png" alt="" style="width:38px;height:38px">
+          <img src="/img/logo.png" alt="" width="38" height="38">
           <span class="brand-text">
             <span class="brand-name">PROLINE</span>
             <span class="brand-sub">Cleaning Solutions</span>
@@ -231,7 +323,7 @@
         <h4>Services</h4>
         <a href="/en/#services">Residential</a>
         <a href="/en/commercial">Commercial</a>
-        <a href="/en/#services">Post-construction</a>
+        <a href="/en/commercial#apres-travaux">Post-construction</a>
         <a href="/en/#services">Floor stripping and waxing</a>
       </div>
       <div class="footer-col">
@@ -245,7 +337,7 @@
         <a href="tel:+15142424779">514 242-4779</a>
         <a href="mailto:info@prolinesolutions.ca">[info@prolinesolutions.ca]</a>
         <span class="note">Mon–Fri, 8am–6pm</span>
-        <a class="btn btn-ghost" href="/en/soumission" style="margin-top:8px">Get a price</a>
+        <a class="btn btn-primary" href="/en/soumission" style="margin-top:12px;align-self:flex-start">Get a price</a>
       </div>
     </div>
     <div class="footer-bottom">

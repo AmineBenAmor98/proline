@@ -7,7 +7,13 @@ from typing import Annotated
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
-from app.models.enums import Audience, Frequency, PropertyType, RequestStatus
+from app.models.enums import (
+    AUDIENCE_BY_PROPERTY_TYPE,
+    Audience,
+    Frequency,
+    PropertyType,
+    RequestStatus,
+)
 
 
 class PropertyIn(BaseModel):
@@ -62,10 +68,23 @@ class QuoteRequestIn(BaseModel):
     # Honeypot: real visitors never fill this.
     website: str | None = Field(default=None, max_length=255)
 
+    @model_validator(mode="after")
+    def audience_matches_property_type(self) -> "QuoteRequestIn":
+        """A house is never a commercial request. Reject the contradiction rather
+        than storing a row nobody can price."""
+        expected = AUDIENCE_BY_PROPERTY_TYPE[self.property.property_type]
+        if self.audience is not expected:
+            raise ValueError(
+                f"property type '{self.property.property_type.value}' is "
+                f"{expected.value}, not {self.audience.value}"
+            )
+        return self
+
 
 class PriceLine(BaseModel):
     code: str
     label_fr: str
+    label_en: str
     amount_cents: int
 
 
@@ -98,3 +117,13 @@ class PriceDraftIn(BaseModel):
     frequency: Frequency = Frequency.one_time
     extras: list[str] = Field(default_factory=list, max_length=12)
     night_access: bool = False
+
+    @model_validator(mode="after")
+    def audience_matches_property_type(self) -> "PriceDraftIn":
+        expected = AUDIENCE_BY_PROPERTY_TYPE[self.property.property_type]
+        if self.audience is not expected:
+            raise ValueError(
+                f"property type '{self.property.property_type.value}' is "
+                f"{expected.value}, not {self.audience.value}"
+            )
+        return self

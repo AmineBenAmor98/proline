@@ -10,7 +10,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -34,6 +34,21 @@ app = FastAPI(
     lifespan=lifespan,
     description="Quote capture, pricing and admin for Proline Cleaning Solutions, Montreal.",
 )
+
+@app.middleware("http")
+async def cache_headers(request: Request, call_next):
+    """In local dev an edited stylesheet must win over the browser cache; in
+    production static assets are cached for an hour."""
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith(("/css/", "/js/", "/img/")):
+        response.headers["Cache-Control"] = (
+            "no-cache" if settings.environment == "local" else "public, max-age=3600"
+        )
+    elif path.endswith(".html") or response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 
 app.include_router(health.router)
 app.include_router(quotes.router, prefix="/api")

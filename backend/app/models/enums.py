@@ -17,6 +17,21 @@ class PropertyType(str, enum.Enum):
     construction = "construction"
 
 
+# A property type belongs to exactly one audience. This is the single source of
+# truth for that pairing: the API rejects any request that contradicts it, and the
+# quote form derives the audience from the property type rather than asking twice.
+AUDIENCE_BY_PROPERTY_TYPE: dict["PropertyType", "Audience"] = {
+    PropertyType.house: Audience.residential,
+    PropertyType.condo: Audience.residential,
+    PropertyType.apartment: Audience.residential,
+    PropertyType.office: Audience.commercial,
+    PropertyType.retail: Audience.commercial,
+    PropertyType.building: Audience.commercial,
+    PropertyType.industrial: Audience.commercial,
+    PropertyType.construction: Audience.commercial,
+}
+
+
 class Frequency(str, enum.Enum):
     one_time = "one_time"
     weekly = "weekly"

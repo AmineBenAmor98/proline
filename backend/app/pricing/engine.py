@@ -17,13 +17,15 @@ class PricingError(ValueError):
     """Raised when the inputs cannot produce a defensible price."""
 
 
-# Extras are shown to the client, so they carry a written label, never a code.
+# Every line the client reads is written in both languages here. The quote page
+# renders the one matching its locale, so an English visitor never sees a French
+# line item next to an English price.
 EXTRA_LABELS = {
-    "fridge": "Intérieur du réfrigérateur",
-    "oven": "Intérieur du four",
-    "windows": "Vitres intérieures",
-    "garage": "Garage",
-    "carpets": "Shampooing de tapis",
+    "fridge": ("Intérieur du réfrigérateur", "Inside the fridge"),
+    "oven": ("Intérieur du four", "Inside the oven"),
+    "windows": ("Vitres intérieures", "Interior windows"),
+    "garage": ("Garage", "Garage"),
+    "carpets": ("Shampooing de tapis", "Carpet shampoo"),
 }
 
 
@@ -44,14 +46,28 @@ def _price_residential(data: PricingInput, card: RateCardData) -> tuple[list[Lin
     if base is None:
         raise PricingError(f"no residential base price for {key}")
 
-    lines = [LineItem("base", f"Ménage de base ({data.bedrooms} ch., {data.bathrooms} sdb)", base)]
+    lines = [
+        LineItem(
+            "base",
+            f"Ménage de base ({data.bedrooms} ch., {data.bathrooms} sdb)",
+            f"Standard clean ({data.bedrooms} bed, {data.bathrooms} bath)",
+            base,
+        )
+    ]
 
     area = data.area_sqft or 0
     extra_area = max(0, area - card.residential_area_allowance_sqft)
     if extra_area and card.residential_area_cents_per_100sqft:
         blocks = math.ceil(extra_area / 100)
         amount = blocks * card.residential_area_cents_per_100sqft
-        lines.append(LineItem("area", f"Superficie supplémentaire ({extra_area} pi²)", amount))
+        lines.append(
+            LineItem(
+                "area",
+                f"Superficie supplémentaire ({extra_area} pi²)",
+                f"Additional area ({extra_area} sq ft)",
+                amount,
+            )
+        )
 
     # No minutes for residential: the price is a flat grid, not a time estimate,
     # and dividing the price by the hourly rate would invent a number.
@@ -81,9 +97,9 @@ def _price_commercial(data: PricingInput, card: RateCardData) -> tuple[list[Line
         minutes *= card.night_access_multiplier
 
     labour = Decimal(minutes) / 60 * card.hourly_rate_cents
-    lines = [LineItem("labour", "Main-d'œuvre estimée", _cents(labour))]
+    lines = [LineItem("labour", "Main-d'œuvre estimée", "Estimated labour", _cents(labour))]
     if card.travel_cents:
-        lines.append(LineItem("travel", "Déplacement", card.travel_cents))
+        lines.append(LineItem("travel", "Déplacement", "Travel", card.travel_cents))
 
     return lines, _cents(minutes)
 
@@ -97,8 +113,9 @@ def price_request(data: PricingInput, card: RateCardData) -> Breakdown:
     for extra in data.extras:
         amount = card.extras_cents.get(extra)
         if amount:
-            label = EXTRA_LABELS.get(extra, extra.replace("_", " ").capitalize())
-            lines.append(LineItem(f"extra:{extra}", label, amount))
+            fallback = extra.replace("_", " ").capitalize()
+            label_fr, label_en = EXTRA_LABELS.get(extra, (fallback, fallback))
+            lines.append(LineItem(f"extra:{extra}", label_fr, label_en, amount))
 
     subtotal = sum(item.amount_cents for item in lines)
     subtotal = max(subtotal, card.minimum_visit_cents)

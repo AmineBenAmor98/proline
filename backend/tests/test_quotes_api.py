@@ -138,3 +138,26 @@ async def test_admin_lists_and_updates(client, admin_headers):
     assert patched.status_code == 200
     assert patched.json()["quoted_total_cents"] == 48000
     assert patched.json()["status"] == "quoted"
+
+
+async def test_commercial_audience_rejects_a_house(client):
+    """The quote form derives the audience from the property type, so a mismatch
+    means a tampered or stale client. Reject it rather than storing a row the
+    pricing engine cannot read."""
+    payload = {**COMMERCIAL, "property": {**COMMERCIAL["property"], "property_type": "house"}}
+    response = await client.post("/api/quotes", json=payload)
+    assert response.status_code == 422
+    assert "residential" in response.text
+
+
+async def test_residential_audience_rejects_a_warehouse(client):
+    payload = {**RESIDENTIAL, "property": {**RESIDENTIAL["property"], "property_type": "industrial"}}
+    response = await client.post("/api/quotes", json=payload)
+    assert response.status_code == 422
+
+
+async def test_price_draft_rejects_a_mismatched_pair(client):
+    draft = {k: RESIDENTIAL[k] for k in ("audience", "property", "frequency", "extras")}
+    draft["property"] = {**draft["property"], "property_type": "office"}
+    response = await client.post("/api/quotes/price", json=draft)
+    assert response.status_code == 422

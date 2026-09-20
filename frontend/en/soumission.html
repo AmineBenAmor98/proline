@@ -20,7 +20,7 @@
 <header class="site-header">
   <div class="container">
     <a class="brand" href="/en">
-      <img src="/img/logo.png" alt="">
+      <img src="/img/logo.png" alt="" width="42" height="42">
       <span class="brand-text">
         <span class="brand-name">PROLINE</span>
         <span class="brand-sub">Cleaning Solutions</span>
@@ -52,39 +52,76 @@
       <div class="grid-2 lean" style="align-items:start">
 
         <form id="quote-form" novalidate>
-          <div class="steps">
-            <span class="step-pill" data-step-pill="1" aria-current="step">01 · The property</span>
-            <span class="step-pill" data-step-pill="2">02 · The need</span>
-            <span class="step-pill" data-step-pill="3">03 · Your details</span>
-          </div>
+          <nav class="steps" aria-label="Form steps">
+            <button type="button" class="step-pill" data-step-pill="1" data-goto="1" aria-current="step">01 · The property</button>
+            <button type="button" class="step-pill" data-step-pill="2" data-goto="2">02 · The need</button>
+            <button type="button" class="step-pill" data-step-pill="3" data-goto="3">03 · Your details</button>
+          </nav>
 
           <!-- Step 1 -->
           <fieldset class="wizard-step" data-step="1">
             <div class="field">
-              <span class="field-label">Type of request</span>
-              <div class="choice-row">
-                <label class="choice"><input type="radio" name="audience" value="residential" checked> Residential</label>
-                <label class="choice"><input type="radio" name="audience" value="commercial"> Commercial</label>
+              <span class="field-label">What kind of place is it?</span>
+              <div class="typegroups" id="typegroups">
+        <div class="typegroup" data-group="residential">
+          <span class="typegroup-label">Residential</span>
+          <div class="tiles">
+            <label class="tile">
+              <input type="radio" name="property_type" value="house" data-audience="residential">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.6 12 3.4l9 7.2"/><path d="M5.6 9.4V20.6h12.8V9.4"/><path d="M10 20.6v-5.4h4v5.4"/></svg>
+              <span>House</span>
+            </label>
+            <label class="tile">
+              <input type="radio" name="property_type" value="condo" data-audience="residential">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.8 20.8V4.2a1 1 0 0 1 1-1h8.4a1 1 0 0 1 1 1v16.6"/><path d="M3.2 20.8h17.6"/><path d="M6.8 8.4h10.4M6.8 12.6h10.4M6.8 16.8h10.4"/></svg>
+              <span>Condo</span>
+            </label>
+            <label class="tile">
+              <input type="radio" name="property_type" value="apartment" data-audience="residential">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.6 20.8V7.8h16.8v13"/><path d="M2.6 20.8h18.8"/><path d="M10 20.8v-5.2h4v5.2"/><path d="M6.4 11.6h2.4M15.2 11.6h2.4"/></svg>
+              <span>Apartment</span>
+            </label>
+          </div>
+        </div>
+        <div class="typegroup" data-group="commercial">
+          <span class="typegroup-label">Commercial</span>
+          <div class="tiles">
+            <label class="tile">
+              <input type="radio" name="property_type" value="office" data-audience="commercial">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.4" y="4.6" width="17.2" height="11.2" rx="1.2"/><path d="M12 15.8v3.6M8.4 19.4h7.2"/></svg>
+              <span>Office</span>
+            </label>
+            <label class="tile">
+              <input type="radio" name="property_type" value="retail" data-audience="commercial">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.4 9.6h15.2v11H4.4z"/><path d="M3 9.6 4.6 5h14.8L21 9.6"/><path d="M10 20.6v-5.2h4v5.2"/></svg>
+              <span>Retail</span>
+            </label>
+            <label class="tile">
+              <input type="radio" name="property_type" value="building" data-audience="commercial">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.6 20.6V3.6h9v17"/><path d="M13.6 20.6V9.4h5.8v11.2"/><path d="M2.8 20.6h18.4"/><path d="M7.4 7h2.4M7.4 11h2.4M7.4 15h2.4M16 13h1.2M16 17h1.2"/></svg>
+              <span>Building</span>
+            </label>
+            <label class="tile">
+              <input type="radio" name="property_type" value="industrial" data-audience="commercial">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.4 20.8V10.2l5 3.2v-3.2l5 3.2V6.4h5.1a1 1 0 0 1 1 1v13.4"/><path d="M2.4 20.8h19.2"/></svg>
+              <span>Industrial</span>
+            </label>
+            <label class="tile">
+              <input type="radio" name="property_type" value="construction" data-audience="commercial">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15.6v-2.4a6 6 0 0 1 12 0v2.4"/><path d="M3.4 15.6h17.2a1.3 1.3 0 0 1 0 2.6H3.4a1.3 1.3 0 0 1 0-2.6z"/><path d="M10.4 8.2V6.4h3.2v1.8"/></svg>
+              <span>Construction site</span>
+            </label>
+          </div>
+        </div>
               </div>
+              <p class="field-error" id="err-property_type" role="alert" hidden></p>
             </div>
 
             <div class="field-group">
               <div class="field">
-                <label for="property_type">Property type</label>
-                <select id="property_type" name="property_type">
-                  <option value="house">House</option>
-                  <option value="condo">Condo</option>
-                  <option value="apartment">Apartment</option>
-                  <option value="office">Office</option>
-                  <option value="retail">Retail</option>
-                  <option value="building">Building</option>
-                  <option value="industrial">Industrial</option>
-                  <option value="construction">Construction site</option>
-                </select>
-              </div>
-              <div class="field">
                 <label for="area_sqft">Approximate area (sq ft)</label>
                 <input type="number" id="area_sqft" name="area_sqft" min="100" max="1000000" inputmode="numeric" placeholder="1200">
+                <p class="field-error" id="err-area_sqft" role="alert" hidden></p>
               </div>
             </div>
 
@@ -135,11 +172,11 @@
             <div class="field" data-when="commercial" hidden>
               <span class="field-label">Services needed</span>
               <div class="choice-row">
-                <label class="choice"><input type="checkbox" name="services" value="office_cleaning"> Bureaux</label>
+                <label class="choice"><input type="checkbox" name="services" value="office_cleaning"> Offices</label>
                 <label class="choice"><input type="checkbox" name="services" value="common_areas"> Common areas</label>
                 <label class="choice"><input type="checkbox" name="services" value="post_construction"> Post-construction</label>
                 <label class="choice"><input type="checkbox" name="services" value="floor_stripping_waxing"> Floor stripping and waxing</label>
-                <label class="choice"><input type="checkbox" name="services" value="carpets"> Tapis</label>
+                <label class="choice"><input type="checkbox" name="services" value="carpets"> Carpets</label>
               </div>
             </div>
 
@@ -176,6 +213,7 @@
               <div class="field">
                 <label for="full_name">Full name *</label>
                 <input type="text" id="full_name" name="full_name" autocomplete="name" required>
+                <p class="field-error" id="err-full_name" role="alert" hidden></p>
               </div>
               <div class="field">
                 <label for="company">Company or condo board</label>
@@ -190,12 +228,16 @@
                 <input type="tel" id="phone" name="phone" autocomplete="tel">
               </div>
             </div>
+            <div class="field" style="margin-top:-8px">
+              <p class="field-error" id="err-contact" role="alert" hidden></p>
+            </div>
             <p class="note" style="margin-bottom:18px">An email or a phone number is enough. We use whichever you prefer.</p>
 
             <label class="checkbox-row">
               <input type="checkbox" name="consent_given" required>
               <span>I agree that this information may be used to answer my request.</span>
             </label>
+            <p class="field-error" id="err-consent_given" role="alert" hidden></p>
             <label class="hp" aria-hidden="true">Do not fill<input type="text" name="website" tabindex="-1" autocomplete="off"></label>
 
             <div id="form-error" class="alert" hidden role="alert"></div>
@@ -242,9 +284,12 @@
   </div>
 </footer>
 
-<div class="callbar">
+<div class="pricebar" id="pricebar">
+  <div>
+    <span class="pricebar-label" id="pricebar-label">Your estimate</span>
+    <div class="pricebar-value is-text" id="pricebar-value">Pick a type of place</div>
+  </div>
   <a class="btn btn-ghost" href="tel:+15142424779">Call</a>
-  <a class="btn btn-primary" href="#quote-form">Open the form</a>
 </div>
 
 <script src="/js/quote.js"></script>

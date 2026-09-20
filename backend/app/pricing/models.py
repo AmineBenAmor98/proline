@@ -10,6 +10,7 @@ from decimal import Decimal
 class LineItem:
     code: str
     label_fr: str
+    label_en: str
     amount_cents: int
 
 
@@ -26,7 +27,12 @@ class Breakdown:
     def as_dict(self) -> dict:
         return {
             "lines": [
-                {"code": item.code, "label_fr": item.label_fr, "amount_cents": item.amount_cents}
+                {
+                    "code": item.code,
+                    "label_fr": item.label_fr,
+                    "label_en": item.label_en,
+                    "amount_cents": item.amount_cents,
+                }
                 for item in self.lines
             ],
             "subtotal_cents": self.subtotal_cents,

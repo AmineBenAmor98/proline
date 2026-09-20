@@ -21,16 +21,21 @@ CARD = RateCardData(
 )
 
 
-def test_residential_extras_carry_a_written_french_label():
+def test_every_line_is_written_in_both_languages():
+    """The quote page renders the label for its own locale, so an English visitor
+    never reads a French line item beside an English price."""
     out = price_request(
         PricingInput(
             audience="residential", property_type="house", bedrooms=3, bathrooms=2,
-            extras=("fridge",),
+            area_sqft=2400, extras=("fridge",),
         ),
         CARD,
     )
-    labels = [line.label_fr for line in out.lines]
-    assert "Intérieur du réfrigérateur" in labels
+    assert "Intérieur du réfrigérateur" in [line.label_fr for line in out.lines]
+    assert "Inside the fridge" in [line.label_en for line in out.lines]
+    for line in out.lines:
+        assert line.label_fr and line.label_en, line.code
+        assert line.label_fr != line.label_en or line.code == "extra:garage"
 
 
 def test_residential_reports_no_invented_minutes():
