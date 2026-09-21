@@ -17,3 +17,4 @@ node_modules/
 
 # scratch archives used to move code into the test sandbox
 *.tgz
+Claude*
