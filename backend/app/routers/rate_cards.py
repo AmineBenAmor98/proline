@@ -1,9 +1,9 @@
-"""The rate card screen's API.
+"""The rate card screen's API: two reads and three writes.
 
-Four reads and two writes. Publishing inserts a new version; the only thing edited
-in place is the online-pricing switch, which is not a price. Preview prices a draft
-against the engine without saving anything, so a change can be checked before
-anyone is quoted with it.
+Reads: the active card, and the version history with how many requests each priced.
+Writes: preview (prices a draft against the engine and saves nothing), publish
+(inserts a new version and closes the old one), and the online-pricing switch --
+the only thing here edited in place, because it is not a price.
 """
 
 from __future__ import annotations

@@ -10,21 +10,9 @@
   var stats = document.getElementById("stats");
   var empty = document.getElementById("empty");
 
-  var STATUS_LABELS = {
-    new: "Nouvelle", enriching: "Analyse", priced: "Chiffrée",
-    quoted: "Envoyée", won: "Gagnée", lost: "Perdue"
-  };
-
-  var FREQUENCY_LABELS = {
-    one_time: "Une seule fois", weekly: "Chaque semaine", biweekly: "Aux 2 semaines",
-    monthly: "Mensuel", to_discuss: "À déterminer"
-  };
-
-  var PROPERTY_LABELS = {
-    house: "Maison", condo: "Condo", apartment: "Appartement", office: "Bureau",
-    retail: "Commerce", building: "Immeuble", industrial: "Industriel",
-    construction: "Chantier"
-  };
+  var STATUS_LABELS = A.STATUS_LABELS;
+  var FREQUENCY_LABELS = A.FREQUENCY_LABELS;
+  var PROPERTY_LABELS = A.PROPERTY_LABELS;
 
   function currentStatus() {
     var el = document.querySelector('input[name="status"]:checked');
@@ -77,11 +65,11 @@
           (row.access_notes ? '<br><span class="note">' + A.esc(row.access_notes.slice(0, 70)) + "</span>" : "") +
         "</td>" +
         "<td>" + A.money(row.computed_total_cents) + "</td>" +
-        '<td><input type="number" class="quoted" style="width:118px" placeholder="$" value="' +
-          (quoted !== null && quoted !== undefined ? quoted / 100 : "") + '"></td>' +
+        '<td><input type="text" inputmode="decimal" class="quoted" style="width:118px" placeholder="$" value="' +
+          (quoted !== null && quoted !== undefined ? A.moneyExact(quoted) : "") + '"></td>' +
         "<td>" + statusChip(row.status) +
           '<br><select class="status-select" style="margin-top:8px;width:128px">' +
-          ["new", "priced", "quoted", "won", "lost"].map(function (s) {
+          ["new", "enriching", "priced", "quoted", "won", "lost"].map(function (s) {
             return '<option value="' + s + '"' + (s === row.status ? " selected" : "") + ">" +
               STATUS_LABELS[s] + "</option>";
           }).join("") + "</select></td>" +
@@ -116,9 +104,10 @@
     var row = event.target.closest("tr");
     if (!row) return;
     if (event.target.classList.contains("quoted")) {
-      var dollars = parseFloat(event.target.value);
-      if (isNaN(dollars)) return;
-      patch(row.dataset.id, { quoted_total_cents: Math.round(dollars * 100) });
+      var cents = A.parseMoney(event.target.value);
+      event.target.classList.toggle("bad", cents === null && event.target.value !== "");
+      if (cents === null) return;
+      patch(row.dataset.id, { quoted_total_cents: cents });
     }
     if (event.target.classList.contains("status-select")) {
       patch(row.dataset.id, { status: event.target.value });

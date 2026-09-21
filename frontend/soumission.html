@@ -68,17 +68,17 @@
           <div class="tiles">
             <label class="tile">
               <input type="radio" name="property_type" value="house" data-audience="residential">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.6 12 3.4l9 7.2"/><path d="M5.6 9.4V20.6h12.8V9.4"/><path d="M10 20.6v-5.4h4v5.4"/></svg>
+              <img src="/img/types/house.webp" alt="" width="192" height="192" loading="lazy">
               <span>Maison</span>
             </label>
             <label class="tile">
               <input type="radio" name="property_type" value="condo" data-audience="residential">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.8 20.8V4.2a1 1 0 0 1 1-1h8.4a1 1 0 0 1 1 1v16.6"/><path d="M3.2 20.8h17.6"/><path d="M6.8 8.4h10.4M6.8 12.6h10.4M6.8 16.8h10.4"/></svg>
+              <img src="/img/types/condo.webp" alt="" width="192" height="192" loading="lazy">
               <span>Condo</span>
             </label>
             <label class="tile">
               <input type="radio" name="property_type" value="apartment" data-audience="residential">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.6 20.8V7.8h16.8v13"/><path d="M2.6 20.8h18.8"/><path d="M10 20.8v-5.2h4v5.2"/><path d="M6.4 11.6h2.4M15.2 11.6h2.4"/></svg>
+              <img src="/img/types/apartment.webp" alt="" width="192" height="192" loading="lazy">
               <span>Appartement</span>
             </label>
           </div>
@@ -88,27 +88,27 @@
           <div class="tiles">
             <label class="tile">
               <input type="radio" name="property_type" value="office" data-audience="commercial">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.4" y="4.6" width="17.2" height="11.2" rx="1.2"/><path d="M12 15.8v3.6M8.4 19.4h7.2"/></svg>
+              <img src="/img/types/office.webp" alt="" width="192" height="192" loading="lazy">
               <span>Bureau</span>
             </label>
             <label class="tile">
               <input type="radio" name="property_type" value="retail" data-audience="commercial">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.4 9.6h15.2v11H4.4z"/><path d="M3 9.6 4.6 5h14.8L21 9.6"/><path d="M10 20.6v-5.2h4v5.2"/></svg>
+              <img src="/img/types/retail.webp" alt="" width="192" height="192" loading="lazy">
               <span>Commerce</span>
             </label>
             <label class="tile">
               <input type="radio" name="property_type" value="building" data-audience="commercial">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.6 20.6V3.6h9v17"/><path d="M13.6 20.6V9.4h5.8v11.2"/><path d="M2.8 20.6h18.4"/><path d="M7.4 7h2.4M7.4 11h2.4M7.4 15h2.4M16 13h1.2M16 17h1.2"/></svg>
+              <img src="/img/types/building.webp" alt="" width="192" height="192" loading="lazy">
               <span>Immeuble</span>
             </label>
             <label class="tile">
               <input type="radio" name="property_type" value="industrial" data-audience="commercial">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.4 20.8V10.2l5 3.2v-3.2l5 3.2V6.4h5.1a1 1 0 0 1 1 1v13.4"/><path d="M2.4 20.8h19.2"/></svg>
+              <img src="/img/types/industrial.webp" alt="" width="192" height="192" loading="lazy">
               <span>Industriel</span>
             </label>
             <label class="tile">
               <input type="radio" name="property_type" value="construction" data-audience="commercial">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15.6v-2.4a6 6 0 0 1 12 0v2.4"/><path d="M3.4 15.6h17.2a1.3 1.3 0 0 1 0 2.6H3.4a1.3 1.3 0 0 1 0-2.6z"/><path d="M10.4 8.2V6.4h3.2v1.8"/></svg>
+              <img src="/img/types/construction.webp" alt="" width="192" height="192" loading="lazy">
               <span>Chantier</span>
             </label>
           </div>
@@ -175,6 +175,7 @@
                 <label class="choice"><input type="checkbox" name="services" value="office_cleaning"> Bureaux</label>
                 <label class="choice"><input type="checkbox" name="services" value="common_areas"> Aires communes</label>
                 <label class="choice"><input type="checkbox" name="services" value="post_construction"> Post-construction</label>
+                <label class="choice"><input type="checkbox" name="services" value="end_of_lease"> Fin de bail</label>
                 <label class="choice"><input type="checkbox" name="services" value="floor_stripping_waxing"> Décapage et cirage</label>
                 <label class="choice"><input type="checkbox" name="services" value="carpets"> Tapis</label>
               </div>

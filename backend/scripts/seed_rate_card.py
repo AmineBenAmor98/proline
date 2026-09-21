@@ -1,7 +1,9 @@
-"""Seed a rate card so the calculator returns numbers today.
+"""Publish a starting rate card so the calculator returns numbers today.
 
 EVERY VALUE HERE IS A PLACEHOLDER. Replace them with Proline's real figures,
-taken from current customers: what they pay, and how long the job really takes.
+taken from current customers: what they pay, and how long the job really takes --
+or, once the app is running, edit them in /admin/tarifs instead of here.
+
 Run:  python -m scripts.seed_rate_card
 """
 
@@ -46,28 +48,45 @@ GRID = {
 
 
 async def main() -> None:
+    """Publish the placeholder grid as a new active version.
+
+    Like the admin screen, this never edits a card in place: `computed_breakdown`
+    on every stored request records the version that priced it, so rewriting a
+    card would make an already-sent quote impossible to reconstruct. Re-running
+    this is a no-op once the card is active.
+    """
     async with SessionLocal() as session:
         existing = (
             await session.execute(select(RateCard).where(RateCard.version == VERSION))
         ).scalars().first()
-        if existing:
-            existing.grid = GRID
-            existing.is_active = True
-            print(f"updated rate card {VERSION}")
-        else:
-            session.add(
-                RateCard(
-                    version=VERSION,
-                    effective_from=date.today(),
-                    is_active=True,
-                    hourly_rate_cents=4500,
-                    minimum_visit_cents=12000,
-                    travel_cents=1500,
-                    grid=GRID,
-                )
+        if existing is not None:
+            print(
+                f"rate card {VERSION} already exists"
+                + (" and is active" if existing.is_active else " (superseded)")
+                + "; edit prices in /admin/tarifs"
             )
-            print(f"created rate card {VERSION}")
+            return
+
+        # Exactly one card is active at a time: close whatever is open first.
+        for card in (
+            await session.execute(select(RateCard).where(RateCard.is_active.is_(True)))
+        ).scalars().all():
+            card.is_active = False
+            card.effective_to = date.today()
+
+        session.add(
+            RateCard(
+                version=VERSION,
+                effective_from=date.today(),
+                is_active=True,
+                hourly_rate_cents=4500,
+                minimum_visit_cents=12000,
+                travel_cents=1500,
+                grid=GRID,
+            )
+        )
         await session.commit()
+        print(f"published rate card {VERSION}")
 
 
 if __name__ == "__main__":

@@ -380,18 +380,28 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 @media (min-width: 520px) { .tiles { grid-template-columns: repeat(3, 1fr); } }
 .tile {
-  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 9px;
-  padding: 14px 13px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  position: relative; display: flex; flex-direction: column; align-items: stretch;
+  padding: 0; overflow: hidden;
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
   background: #fff; cursor: pointer; font-size: 0.88rem; font-weight: 500; color: var(--ink);
-  min-height: 84px; transition: border-color var(--t), background var(--t), box-shadow var(--t);
+  transition: border-color var(--t), box-shadow var(--t);
 }
 .tile input { position: absolute; opacity: 0; width: 0; height: 0; }
-.tile svg { width: 25px; height: 25px; color: var(--navy); flex: none; }
-.tile:hover { border-color: var(--line-strong); }
-.tile:has(input:checked) {
-  border-color: var(--navy); background: var(--cream); box-shadow: inset 0 0 0 1px var(--navy);
+/* The illustration sits on its own cream panel; object-fit keeps it centred. */
+.tile img {
+  display: block; width: 100%; height: 80px; object-fit: contain;
+  padding: 10px 0; background: var(--cream); border-bottom: 1px solid var(--cream-line);
 }
-.tile:has(input:checked) svg { color: var(--gold-ink); }
+@media (min-width: 520px) { .tile img { height: 100px; padding: 12px 0; } }
+.tile span { padding: 11px 13px; }
+.tile:hover { border-color: var(--line-strong); }
+.tile:has(input:checked) { border-color: var(--navy); box-shadow: inset 0 0 0 1px var(--navy); }
+/* Gold check, because a border alone is easy to miss on an illustrated card. */
+.tile:has(input:checked)::after {
+  content: ""; position: absolute; top: 8px; right: 8px; width: 19px; height: 19px;
+  border-radius: 50%; background: var(--gold) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 11px 11px no-repeat;
+  box-shadow: 0 1px 3px rgba(15, 23, 40, 0.18);
+}
 .tile:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* ---------- inline field errors ---------- */

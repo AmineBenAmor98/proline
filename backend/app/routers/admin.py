@@ -1,5 +1,8 @@
-"""Admin API. Until sprint 4 this is a list, a detail patch, and nothing else:
-Amine needs to see requests and adjust a price, not a CRM."""
+"""The requests half of the admin API: sign in, list, adjust a price, set a status.
+
+The rate card half lives in `app/routers/rate_cards.py` under the same /admin
+prefix and the same token.
+"""
 
 from __future__ import annotations
 

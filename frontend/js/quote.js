@@ -30,9 +30,6 @@
                : "L'envoi a échoué. Appelez-nous au 514 242-4779 et nous prenons la demande au téléphone.",
     sending: EN ? "Sending…" : "Envoi…",
     submit: EN ? "Send my request" : "Envoyer ma demande",
-    thanksFirm: EN ? "Your price is confirmed." : "Votre prix est confirmé.",
-    thanksReview: EN ? "Thank you. Your written quote arrives within 24 hours."
-                     : "Merci. Votre soumission écrite vous parvient sous 24 h.",
     reference: EN ? "Reference" : "Référence",
     chooseType: EN ? "Pick a type of place and your price appears here."
                    : "Choisissez un type de lieu : le prix apparaît ici.",

@@ -7,6 +7,22 @@ window.ProlineAdmin = (function () {
 
   var KEY = "proline_admin_session";
 
+  /* Shared vocabulary. Defined once here because both admin screens render the
+     same words, and two copies drifted apart the first time they existed. */
+  var STATUS_LABELS = {
+    new: "Nouvelle", enriching: "Analyse", priced: "Chiffrée",
+    quoted: "Envoyée", won: "Gagnée", lost: "Perdue"
+  };
+  var FREQUENCY_LABELS = {
+    one_time: "Une seule fois", weekly: "Chaque semaine", biweekly: "Aux 2 semaines",
+    monthly: "Mensuel", to_discuss: "À déterminer"
+  };
+  var PROPERTY_LABELS = {
+    house: "Maison", condo: "Condo", apartment: "Appartement", office: "Bureau",
+    retail: "Commerce", building: "Immeuble", industrial: "Industriel",
+    construction: "Chantier"
+  };
+
   function session() {
     try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; }
   }
@@ -228,8 +244,9 @@ window.ProlineAdmin = (function () {
   }
 
   return {
+    STATUS_LABELS: STATUS_LABELS, FREQUENCY_LABELS: FREQUENCY_LABELS,
+    PROPERTY_LABELS: PROPERTY_LABELS,
     boot: boot, api: api, apiMessage: apiMessage,
-    session: session, setSession: setSession, showLogin: showLogin,
     money: money, moneyExact: moneyExact, parseMoney: parseMoney,
     parseIntStrict: parseIntStrict, parseDecimalStrict: parseDecimalStrict,
     when: when, day: day, esc: esc

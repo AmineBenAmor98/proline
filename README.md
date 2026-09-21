@@ -76,8 +76,57 @@ no network, so its tests need nothing running.
   restrooms, night access and travel. Computed and stored, **never shown**: the client is
   told a written quote arrives within 24 h, and a human reviews the number first.
 
-Rate cards are versioned rows (`rate_cards`). A price change creates a new row; old quotes
-still recompute to what the client was given.
+Rate cards are versioned rows (`rate_cards`) — see the next section for how to change one.
+
+## Pricing: the rate card
+
+Every price the site shows comes from the **active rate card** row, read from the
+database on each request. Changing a price does not need a deploy.
+
+**Edit it at `/admin/tarifs`.** The screen edits a draft held in your browser
+(it survives a reload); nothing reaches a visitor until you publish. Before you
+publish, the right-hand panel prices three scenarios with the live card and with
+your draft side by side -- that is the check that catches a decimal slip.
+
+**Publishing INSERTs a new version.** It never rewrites a card, because
+`computed_breakdown` on every stored request records the `rate_card_version` that
+priced it: rewrite the card and a quote you already sent can no longer be
+explained. Publishing closes the previous card (`effective_to`, `is_active=false`)
+and opens the new one, in one transaction. `scripts/seed_rate_card` obeys the same
+rule and is a no-op once its card exists.
+
+**The one field edited in place is `residential_online_pricing`** -- the switch at
+the top of the screen. It is not a price, so flipping it cannot change what an
+old quote recomputes to, and a version nobody priced anything with would be noise
+in the history. Off means residential requests stop getting a firm price and are
+quoted by a person, exactly like commercial.
+
+**An empty cell in the grid means "not offered online".** A bedroom/bathroom
+combination with no price is not guessed or interpolated: the request comes in as
+a lead and the form says it is chiffré à la main. Launch with the configurations
+you have actually cleaned and add the rest later.
+
+**Validation lives in `app/schemas/rate_card.py`.** The bounds are not opinions
+about what to charge -- they exist so a slip (18500 typed where 1850 was meant) is
+refused by the server rather than quoted to the next visitor. A base price below
+the minimum visit is rejected outright, since the minimum would silently swallow it.
+
+Endpoints, all under the admin token:
+
+| | |
+|---|---|
+| `GET /api/admin/rate-card` | the active card |
+| `GET /api/admin/rate-cards` | every version, with how many requests each priced |
+| `POST /api/admin/rate-card/preview` | price scenarios against an unsaved draft; writes nothing |
+| `POST /api/admin/rate-card` | publish a new version |
+| `PATCH /api/admin/rate-card/online-pricing` | the switch |
+
+Adding a **service code** means touching four places, because nothing generates the
+frontend from the backend: `app/models/enums.py` (`ServiceCode`), the seeded grid's
+`minutes_per_100sqft`, `SERVICE_LABELS` in `frontend/js/rates.js`, and the
+checkboxes in `frontend/soumission.html`. The test
+`test_every_service_the_form_offers_is_a_real_code` catches the last two drifting
+apart; the first two are on you.
 
 ## The quote form
 
@@ -120,8 +169,11 @@ a size or a radius outside them is how this drifts, so don't.
 
 ## What is still a placeholder
 
-- **The rate grid** in `scripts/seed_rate_card.py` — every number is invented. Replace it
-  with Proline's real figures before any price is shown publicly.
+- **The rate grid** — every number in `scripts/seed_rate_card.py` is invented. Replace them
+  with Proline's real figures before any price is shown publicly. You no longer edit that
+  file to do it: put the real numbers in at `/admin/tarifs` and publish. Until then, the
+  honest option is the switch at the top of that screen, which stops the site quoting
+  residential prices at all.
 - **Admin auth** is one username and password from the environment, with a signed 12-hour
   token. Fine for one person; replace with per-user accounts before anyone else gets access.
   Local defaults: `admin` / `proline`.

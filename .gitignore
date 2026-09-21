@@ -14,3 +14,6 @@ htmlcov/
 
 node_modules/
 .DS_Store
+
+# scratch archives used to move code into the test sandbox
+*.tgz

@@ -83,7 +83,7 @@ if FRONTEND_DIR.is_dir():
             url = "/en" if page.stem == "index" else f"/en/{page.stem}"
             _register_page(url, page)
 
-    # Admin is one page; its API calls carry the token.
+    # Two admin screens, both gated by the token their API calls carry.
     admin_index = FRONTEND_DIR / "admin" / "index.html"
     if admin_index.is_file():
         _register_page("/admin", admin_index)

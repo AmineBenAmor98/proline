@@ -26,9 +26,7 @@
     garage: "Garage",
     carpets: "Shampooing de tapis"
   };
-  var FREQUENCY_LABELS = {
-    monthly: "Mensuel", biweekly: "Aux 2 semaines", weekly: "Chaque semaine"
-  };
+  var FREQUENCY_LABELS = A.FREQUENCY_LABELS;
   var FIELD_LABELS = {
     hourly_rate_cents: "Taux horaire",
     minimum_visit_cents: "Visite minimum",
@@ -158,13 +156,13 @@
     var out = [];
     Object.keys(after).forEach(function (key) {
       var was = before[key];
-      if (!was) { out.push({ key: key, label: after[key].label, from: "—", to: show(after[key]), added: true }); return; }
+      if (!was) { out.push({ label: after[key].label, from: "—", to: show(after[key]) }); return; }
       if (String(was.value) !== String(after[key].value)) {
-        out.push({ key: key, label: after[key].label, from: show(was), to: show(after[key]) });
+        out.push({ label: after[key].label, from: show(was), to: show(after[key]) });
       }
     });
     Object.keys(before).forEach(function (key) {
-      if (!after[key]) out.push({ key: key, label: before[key].label, from: show(before[key]), to: "retiré", removed: true });
+      if (!after[key]) out.push({ label: before[key].label, from: show(before[key]), to: "retiré" });
     });
     return out;
   }
@@ -210,6 +208,27 @@
 
   /* Not validation: a nudge when a bigger home costs less than a smaller one, which
      is nearly always a typo and nearly always invisible in a list of numbers. */
+  /* Update one cell's "était" label in place. A full re-render on every keystroke
+     would take the focus out of the field being typed into. */
+  function markCell(node, key) {
+    var td = node.closest("td");
+    if (!td) return;
+    var was = ((active.grid || {}).residential_base_cents || {})[key];
+    var moved = was !== undefined && was !== draft.grid.residential_base_cents[key];
+    td.classList.toggle("changed", moved);
+    var label = td.querySelector(".was");
+    if (moved) {
+      if (!label) {
+        label = document.createElement("span");
+        label.className = "was";
+        td.appendChild(label);
+      }
+      label.textContent = "était " + A.moneyExact(was);
+    } else if (label) {
+      label.remove();
+    }
+  }
+
   function renderMatrixWarnings() {
     var base = draft.grid.residential_base_cents || {};
     var notes = [];
@@ -237,12 +256,12 @@
       : "";
   }
 
-  function pairRow(id, label, note, value, kind, unit, prefix) {
+  function pairRow(id, label, note, value, kind, unit) {
     return '<div class="pair-row">' +
       '<div><label for="' + id + '">' + A.esc(label) + "</label>" +
       (note ? '<p class="note">' + note + "</p>" : "") + "</div>" +
       '<input id="' + id + '" data-key="' + id + '" data-kind="' + kind + '"' +
-      (unit ? ' data-unit="' + unit + '"' : "") + (prefix ? ' data-prefix="' + prefix + '"' : "") +
+      (unit ? ' data-unit="' + unit + '"' : "") +
       ' inputmode="decimal" value="' + A.esc(value) + '"></div>';
   }
 
@@ -342,10 +361,17 @@
     if (value === null) return false;
 
     var cell = node.dataset.cell;
-    if (cell) { draft.grid.residential_base_cents[cell] = value; return true; }
+    if (cell) {
+      draft.grid.residential_base_cents[cell] = value;
+      markCell(node, cell);
+      return true;
+    }
 
     var key = node.dataset.key || node.id;
-    if (key.indexOf("min:") === 0) draft.grid.minutes_per_100sqft[key.slice(4)] = value;
+    if (key.indexOf("min:") === 0) {
+      draft.grid.minutes_per_100sqft[key.slice(4)] = value;
+      refreshDerived();
+    }
     else if (key.indexOf("extra:") === 0) draft.grid.extras_cents[key.slice(6)] = value;
     else if (key.indexOf("disc:") === 0) draft.grid.frequency_discount_pct[key.slice(5)] = value;
     else if (key === "f-hourly") draft.hourly_rate_cents = value;
@@ -416,8 +442,6 @@
   function openReview() {
     var list = changes();
     el.reviewError.hidden = true;
-    el.reviewIntro.textContent = "Cette publication crée une nouvelle version. Les " +
-      "demandes déjà chiffrées gardent la leur.";
     el.reviewChanges.innerHTML = '<table class="review-table"><tbody>' + list.map(function (c) {
       return "<tr><td>" + A.esc(c.label) + '</td><td class="from">' + A.esc(c.from) +
         '</td><td class="arrow">→</td><td class="to">' + A.esc(c.to) + "</td></tr>";
@@ -486,13 +510,39 @@
     if (applyInput(node)) afterEdit();
   });
 
-  /* Re-format on blur so the field always shows canonical "195,00 $". */
+  /* Canonical form on blur -- for THAT field only.
+     Re-rendering the matrix here destroyed the input the visitor was moving into:
+     blur on cell A fires while the click on cell B is still resolving, B is
+     replaced, and everything typed into it is lost. */
+  function formatFor(node, value) {
+    if (node.dataset.cell || node.dataset.kind === "money") return A.moneyExact(value);
+    if (node.dataset.kind === "pct") return value + " %";
+    if (node.dataset.kind === "decimal") return (node.dataset.prefix || "") + value;
+    return value + (node.dataset.unit || "");
+  }
+
+  /* The "= 4,50 $ / 100 pi²" hints depend on the hourly rate, so they move when it
+     does. Updated in place for the same reason: a rebuild would steal the focus. */
+  function refreshDerived() {
+    Object.keys(SERVICE_LABELS).forEach(function (code) {
+      var input = document.getElementById("min:" + code);
+      if (!input) return;
+      var row = input.closest(".pair-row");
+      var span = row && row.querySelector(".derived");
+      if (!span) return;
+      var minutes = draft.grid.minutes_per_100sqft[code];
+      span.textContent = "= " + A.moneyExact(Math.round(minutes / 60 * draft.hourly_rate_cents)) +
+        " / 100 pi²";
+    });
+  }
+
   document.addEventListener("blur", function (event) {
     var node = event.target;
     if (!node.matches || !node.matches("input[data-kind], input[data-cell]")) return;
-    if (readInput(node) === null) return;
-    renderMatrix();
-    renderRows();
+    var value = readInput(node);
+    if (value === null) return;
+    node.value = formatFor(node, value);
+    if (node.id === "f-hourly") refreshDerived();
   }, true);
 
   el.matrix.addEventListener("click", function (event) {

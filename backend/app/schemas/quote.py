@@ -1,4 +1,10 @@
-"""Pydantic is the single source of truth: the frontend types are generated from these."""
+"""Request and response shapes for the public quote flow.
+
+These are the contract the API enforces, but nothing generates the frontend from
+them: the JS keeps its own copies of the service and extra labels. Adding a service
+code means touching `app/models/enums.py`, the seeded grid, `frontend/js/rates.js`
+and the checkboxes in `frontend/soumission.html`.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +19,7 @@ from app.models.enums import (
     Frequency,
     PropertyType,
     RequestStatus,
+    ServiceCode,
 )
 
 
@@ -57,7 +64,7 @@ class Attribution(BaseModel):
 class QuoteRequestIn(BaseModel):
     audience: Audience
     property: PropertyIn
-    services: list[str] = Field(default_factory=list, max_length=12)
+    services: list[ServiceCode] = Field(default_factory=list, max_length=12)
     frequency: Frequency = Frequency.one_time
     extras: list[str] = Field(default_factory=list, max_length=12)
     desired_start: date | None = None
@@ -113,7 +120,7 @@ class PriceDraftIn(BaseModel):
 
     audience: Audience
     property: PropertyIn
-    services: list[str] = Field(default_factory=list, max_length=12)
+    services: list[ServiceCode] = Field(default_factory=list, max_length=12)
     frequency: Frequency = Frequency.one_time
     extras: list[str] = Field(default_factory=list, max_length=12)
     night_access: bool = False

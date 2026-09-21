@@ -161,3 +161,25 @@ async def test_price_draft_rejects_a_mismatched_pair(client):
     draft["property"] = {**draft["property"], "property_type": "office"}
     response = await client.post("/api/quotes/price", json=draft)
     assert response.status_code == 422
+
+
+async def test_an_unknown_service_code_is_refused(client):
+    """`services` is a list of ServiceCode now, not free text: a code the pricing
+    grid has never heard of should not reach the database."""
+    payload = {**COMMERCIAL, "services": ["office_cleaning", "window_washing_by_drone"]}
+    response = await client.post("/api/quotes", json=payload)
+    assert response.status_code == 422
+
+
+async def test_every_service_the_form_offers_is_a_real_code(client):
+    """The quote form and the enum drift apart silently otherwise."""
+    import re
+    from pathlib import Path
+
+    from app.main import FRONTEND_DIR
+    from app.models.enums import ServiceCode
+
+    markup = (Path(FRONTEND_DIR) / "soumission.html").read_text(encoding="utf-8")
+    offered = set(re.findall(r'name="services" value="([^"]+)"', markup))
+    assert offered, "the form offers no services at all"
+    assert offered <= {code.value for code in ServiceCode}, offered

@@ -230,6 +230,7 @@ TEXT = [
     ("Choisissez un type de lieu", "Pick a type of place"),
     # --- service labels that were still French on the English page ---
     ("> Bureaux</label>", "> Offices</label>"),
+    ("> Fin de bail</label>", "> End of lease</label>"),
     ("> Tapis</label>", "> Carpets</label>"),
     # --- quote wizard ---
     ("Demande de soumission", "Quote request"),

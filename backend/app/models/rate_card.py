@@ -8,8 +8,13 @@ from app.db.base import TimestampedBase
 
 
 class RateCard(TimestampedBase):
-    """Versioned pricing grid. Never edited in place: a price change creates a new row,
-    so a quote sent last spring still recomputes to the number the client received."""
+    """Versioned pricing grid.
+
+    Never edited in place: a price change creates a new row, so a quote sent last
+    spring still recomputes to the number the client received. Both writers obey
+    this -- `services/rate_cards.publish_rate_card` and `scripts/seed_rate_card`.
+    The single exception is `residential_online_pricing` below.
+    """
 
     __tablename__ = "rate_cards"
 
