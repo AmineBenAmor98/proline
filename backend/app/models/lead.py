@@ -1,4 +1,3 @@
-import uuid
 
 from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -28,5 +27,3 @@ class Lead(TimestampedBase):
 
     properties: Mapped[list["Property"]] = relationship(back_populates="lead")  # noqa: F821
     requests: Mapped[list["QuoteRequest"]] = relationship(back_populates="lead")  # noqa: F821
-
-    id: Mapped[uuid.UUID]

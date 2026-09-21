@@ -23,7 +23,11 @@ LINKS = [
     ('href="/soumission"', 'href="/en/soumission"'),
     ('href="/commercial#apres-travaux"', 'href="/en/commercial#apres-travaux"'),
     ('href="/commercial"', 'href="/en/commercial"'),
+    # The link and the id have to move together: rewriting only the href left
+    # "Residential" on the English pages pointing at a section that is still
+    # id="residentiel", so it scrolled nowhere.
     ('href="/#residentiel"', 'href="/en/#residential"'),
+    ('id="residentiel"', 'id="residential"'),
     ('href="/#services"', 'href="/en/#services"'),
     ('href="/"', 'href="/en"'),
 ]
@@ -33,17 +37,42 @@ SWITCH = [
     ('href="/en/soumission">EN', "@@FR_SOUMISSION@@"),
     ('href="/en/commercial">EN', "@@FR_COMMERCIAL@@"),
     ('href="/en">EN', "@@FR_HOME@@"),
+    # Footer switch: same idea, but the label is a word rather than "EN".
+    ('href="/en/soumission">English', "@@FR_F_SOUMISSION@@"),
+    ('href="/en/commercial">English', "@@FR_F_COMMERCIAL@@"),
+    ('href="/en">English', "@@FR_F_HOME@@"),
 ]
 
 TEXT = [
     ('lang="fr"', 'lang="en"'),
     ('data-locale="fr"', 'data-locale="en"'),
+    # --- the English tree must declare ITSELF canonical, or Google drops it ---
+    ('rel="canonical" href="https://prolinesolutions.ca/"',
+     'rel="canonical" href="https://prolinesolutions.ca/en"'),
+    ('rel="canonical" href="https://prolinesolutions.ca/commercial"',
+     'rel="canonical" href="https://prolinesolutions.ca/en/commercial"'),
+    ('rel="canonical" href="https://prolinesolutions.ca/soumission"',
+     'rel="canonical" href="https://prolinesolutions.ca/en/soumission"'),
+    ('property="og:url" content="https://prolinesolutions.ca/"',
+     'property="og:url" content="https://prolinesolutions.ca/en"'),
+    ('property="og:url" content="https://prolinesolutions.ca/commercial"',
+     'property="og:url" content="https://prolinesolutions.ca/en/commercial"'),
+    ('property="og:url" content="https://prolinesolutions.ca/soumission"',
+     'property="og:url" content="https://prolinesolutions.ca/en/soumission"'),
+    ('property="og:locale" content="fr_CA"', 'property="og:locale" content="en_CA"'),
+    ("Proline Cleaning Solutions — Entretien ménager, Grand Montréal",
+     "Proline Cleaning Solutions — Cleaning services, Greater Montreal"),
+    ("Entretien ménager commercial à Montréal — Proline Cleaning Solutions",
+     "Commercial cleaning in Montreal — Proline Cleaning Solutions"),
+    ("Bureaux, commerces, immeubles et après-travaux. Soumission écrite sous 24 h.",
+     "Offices, retail, buildings and post-construction. A written quote within 24 hours."),
+    ("Prix en ligne pour les logements, soumission écrite sous 24 h pour les entreprises.",
+     "An online price for homes, a written quote within 24 hours for businesses."),
     ('hreflang="en-ca" href="https://prolinesolutions.ca/en', 'hreflang="en-ca" href="https://prolinesolutions.ca/en'),
     # --- meta ---
     ("Entretien ménager commercial et résidentiel, Montréal", "Commercial and residential cleaning, Montreal"),
     ("Nettoyage commercial, industriel, résidentiel et post-construction à Montréal. Prix en ligne pour les logements, soumission écrite sous 24 h pour les entreprises.",
      "Commercial, industrial, residential and post-construction cleaning in Montreal. An online price for homes, a written quote within 24 hours for businesses."),
-    ("Entretien ménager commercial à Montréal", "Commercial cleaning in Montreal"),
     ("Entretien de bureaux, commerces, immeubles et après-travaux à Montréal. Liste de tâches écrite par zone, soumission écrite sous 24 h.",
      "Cleaning for offices, retail, buildings and post-construction in Montreal. A written task list per zone, quote within 24 hours."),
     ("Obtenir un prix — Proline Cleaning Solutions", "Get a price — Proline Cleaning Solutions"),
@@ -55,13 +84,16 @@ TEXT = [
      "Offices, retail, buildings and post-construction. A written quote within 24 hours."),
     ("Prix en ligne pour les logements, soumission écrite sous 24 h pour les entreprises.",
      "An online price for homes, a written quote within 24 hours for businesses."),
-    ('og:locale" content="fr_CA"', 'og:locale" content="en_CA"'),
-    ('og:url" content="https://prolinesolutions.ca/commercial"', 'og:url" content="https://prolinesolutions.ca/en/commercial"'),
-    ('og:url" content="https://prolinesolutions.ca/"', 'og:url" content="https://prolinesolutions.ca/en"'),
+    # --- image alternatives -------------------------------------------------
+    # Every other alt on the site was translated; these two -- the hero images --
+    # were missed, so a screen reader on the English pages read French for the
+    # largest image on each of them.
+    ("Salon d'un condo montréalais fraîchement nettoyé, plancher de bois et comptoir de quartz",
+     "Living room of a freshly cleaned Montreal condo, wood floor and quartz counter"),
+    ("Corridor de bureaux au crépuscule, plancher poli et chariot d'entretien au fond",
+     "Office hallway at dusk, polished floor and a cleaning cart at the far end"),
     # --- navigation ---
     (">Accueil<", ">Home<"),
-    ("> Résidentiel</label>", "> Residential</label>"),
-    ("> Commercial</label>", "> Commercial</label>"),
     (">Commercial<", ">Commercial<"),
     (">Résidentiel<", ">Residential<"),
     (">Soumission<", ">Quote<"),
@@ -74,7 +106,6 @@ TEXT = [
     ("Calculer mon prix", "Calculate my price"),
     ("Bureaux, commerces, immeubles, après-travaux.", "Offices, retail, buildings, post-construction."),
     ("Demander une soumission", "Request a quote"),
-    ("[PHOTO — équipe Proline au travail]", "[PHOTO — the Proline team at work]"),
     ("Assurée et cautionnée", "Insured and bonded"),
     ("Produits et équipement fournis", "Products and equipment supplied"),
     ("Satisfaction garantie ou reprise", "Satisfaction guaranteed or we come back"),
@@ -104,7 +135,24 @@ TEXT = [
     ("Aperçu du calculateur", "Calculator preview"),
     ("3 chambres", "3 bedrooms"),
     ("2 salles de bain", "2 bathrooms"),
+    # --- structured data and the quote page's social card ---
+    ("Obtenir un prix — Proline Cleaning Solutions", "Get a price — Proline Cleaning Solutions"),
+    ("Votre prix en ligne en deux minutes pour un logement, soumission écrite sous 24 h pour un local commercial.",
+     "Your price online in two minutes for a home, a written quote within 24 hours for a commercial space."),
+    ('"name":"Entretien ménager commercial"', '"name":"Commercial cleaning"'),
+    ('"name":"Entretien ménager résidentiel"', '"name":"Residential cleaning"'),
+    ('"name":"Nettoyage post-construction"', '"name":"Post-construction cleaning"'),
+    ('"name":"Décapage et cirage de planchers"', '"name":"Floor stripping and waxing"'),
+    ('"serviceType":"Entretien ménager commercial et industriel"',
+     '"serviceType":"Commercial and industrial cleaning"'),
+    ('"url":"https://prolinesolutions.ca/commercial"', '"url":"https://prolinesolutions.ca/en/commercial"'),
+    ('"url":"https://prolinesolutions.ca/"', '"url":"https://prolinesolutions.ca/en"'),
+    ("Bureaux, commerces, immeubles, industriel et post-construction. Soumission écrite sous 24 h.",
+     "Offices, retail, buildings, industrial and post-construction. A written quote within 24 hours."),
+    ("Nettoyage commercial, industriel, résidentiel et post-construction.",
+     "Commercial, industrial, residential and post-construction cleaning."),
     ("[SUP] pi²", "[AREA] sq ft"),
+    ("[PRIX] $", "[PRICE] $"),
     ("par visite · aux deux semaines", "per visit · every two weeks"),
     ("Estimation ferme pour un logement standard. Un cas particulier est confirmé avant la première visite.",
      "A firm price for a standard home. Anything unusual is confirmed before the first visit."),
@@ -160,7 +208,6 @@ TEXT = [
      "Offices, retail, common areas, light industrial and post-construction. A program built around your access hours, written quote within 24 hours."),
     ("Obtenir une soumission", "Request a quote"),
     ("Planifier un appel", "Schedule a call"),
-    ("[PHOTO — corridor ou bureau entretenu]", "[PHOTO — a maintained hallway or office]"),
     ("Ce qui est inclus", "What is included"),
     ("Bureau aux murs crème et panneaux marine, postes de travail et aire de détente sous de hautes fenêtres",
      "An office with cream walls and navy panels, workstations and a lounge area under tall windows"),
@@ -240,12 +287,10 @@ TEXT = [
     ("01 · La propriété", "01 · The property"),
     ("02 · Le besoin", "02 · The need"),
     ("03 · Vos coordonnées", "03 · Your details"),
-    ("Type de demande", "Type of request"),
-    ("Type de propriété", "Property type"),
     ("Superficie approximative (pi²)", "Approximate area (sq ft)"),
     (">Maison<", ">House<"), (">Condo<", ">Condo<"), (">Appartement<", ">Apartment<"),
     (">Bureau<", ">Office<"), (">Commerce<", ">Retail<"), (">Immeuble<", ">Building<"),
-    (">Industriel<", ">Industrial<"), (">Chantier / après-travaux<", ">Construction site<"),
+    (">Industriel<", ">Industrial<"),
     ("Chambres", "Bedrooms"),
     ("Salles de bain", "Bathrooms"),
     ("Nombre de sanitaires", "Number of restrooms"),
@@ -260,12 +305,9 @@ TEXT = [
     ("Mensuel", "Monthly"),
     ("Services recherchés", "Services needed"),
     ("Aires communes", "Common areas"),
-    (">Tapis<", ">Carpets<"),
-    (">Bureaux<", ">Offices<"),
+    # The extras themselves are no longer in the page: the form renders them from
+    # the rate card, which carries both languages. Only the group label is markup.
     ("Extras", "Extras"),
-    ("Intérieur du réfrigérateur", "Inside the fridge"),
-    ("Intérieur du four", "Inside the oven"),
-    ("Vitres intérieures", "Interior windows"),
     ("Début souhaité", "Preferred start"),
     ("Accès et contraintes", "Access and constraints"),
     ("Horaires, stationnement, zones prioritaires…", "Hours, parking, priority areas…"),
@@ -285,7 +327,6 @@ TEXT = [
     ("Taxes en sus. Estimation ferme pour un logement standard.", "Taxes extra. A firm price for a standard home."),
     ("Une question ?", "A question?"),
     ("Retour à l'accueil", "Back to home"),
-    ("Remplir le formulaire", "Open the form"),
     # --- footer ---
     ("Nettoyage commercial, industriel, résidentiel et post-construction, incluant le décapage et le cirage. Grand Montréal.",
      "Commercial, industrial, residential and post-construction cleaning, including floor stripping and waxing. Greater Montreal."),
@@ -296,8 +337,15 @@ TEXT = [
     ("Lun–ven, 8 h–18 h", "Mon–Fri, 8am–6pm"),
     ("[Confidentialité] · [Conditions]", "[Privacy] · [Terms]"),
     ("Appeler", "Call"),
-    ("English", "Français"),
 ]
+
+
+# Applied longest source first. In file order, a short entry destroyed the tail
+# of a longer one that had not run yet: ("Retour", "Back") shipped
+# "Back à l'accueil" on the English success page, and three other strings went
+# out half-translated the same way. Length ordering makes that impossible.
+ORDERED = sorted(TEXT, key=lambda pair: len(pair[0]), reverse=True)
+USED: set[str] = set()
 
 
 def translate(html: str) -> str:
@@ -308,28 +356,70 @@ def translate(html: str) -> str:
     html = html.replace("@@FR_SOUMISSION@@", 'href="/soumission">FR')
     html = html.replace("@@FR_COMMERCIAL@@", 'href="/commercial">FR')
     html = html.replace("@@FR_HOME@@", 'href="/">FR')
-    for src, dst in TEXT:
+    html = html.replace("@@FR_F_SOUMISSION@@", 'href="/soumission">Français')
+    html = html.replace("@@FR_F_COMMERCIAL@@", 'href="/commercial">Français')
+    html = html.replace("@@FR_F_HOME@@", 'href="/">Français')
+    for src, dst in ORDERED:
+        if src in html:
+            USED.add(src)
         html = html.replace(src, dst)
     return html
+
+
+# Words that are French but belong on the English pages anyway.
+ALLOWED = {"Français", "Montréal", "Proline"}
+
+# Text the checker should not read: the language switch, and the JSON-LD address
+# where "Montréal" is the city's name rather than a word to translate.
+VISIBLE = re.compile(r"<(script|style)[\s\S]*?</\1>")
+TEXT_AND_ATTRS = re.compile(
+    r'>([^<]+)<|(?:alt|title|content|placeholder|aria-label)="([^"]*)"'
+)
+ACCENTED = re.compile(r"\b\w*[àâäçéèêëîïôöùûüœ]\w*\b", re.IGNORECASE)
+
+
+def leftovers(html: str) -> list[str]:
+    """French that reached an English page.
+
+    The old check was a five-word hand-written list, which is why a half-French
+    meta description, a French alt on the hero image and a "Back à l'accueil"
+    button all shipped without a warning. Anything accented in visible text or in
+    an attribute a human or a screen reader reads is suspect, and the allowlist
+    is short enough to stay honest.
+    """
+    body = VISIBLE.sub("", html)
+    found = []
+    for text, attr in TEXT_AND_ATTRS.findall(body):
+        for word in ACCENTED.findall(text or attr):
+            if word not in ALLOWED and word not in found:
+                found.append(word)
+    return found
 
 
 def main() -> int:
     out_dir = ROOT / "en"
     out_dir.mkdir(exist_ok=True)
+    problems = 0
     for name in PAGES:
         source = (ROOT / name).read_text(encoding="utf-8")
-        (out_dir / name).write_text(translate(source), encoding="utf-8")
+        english = translate(source)
+        (out_dir / name).write_text(english, encoding="utf-8")
         print(f"wrote en/{name}")
-
-    # Anything still obviously French in the English tree is a missing entry.
-    suspects = ["Soumission", "Résidentiel", "Superficie", "Courriel", "Envoyer"]
-    for name in PAGES:
-        text = (out_dir / name).read_text(encoding="utf-8")
-        body = re.sub(r"<(script|style)[\s\S]*?</\1>", "", text)
-        found = [word for word in suspects if word in body]
+        found = leftovers(english)
         if found:
-            print(f"  warning: en/{name} still contains {found}")
-    return 0
+            problems += 1
+            print(f"  FRENCH LEFT IN en/{name}: {', '.join(found)}")
+
+    # An entry that matches nothing is the map drifting away from the pages it
+    # describes -- the exact failure this file exists to prevent, so it is
+    # reported rather than left to rot.
+    dead = [src for src, _ in TEXT if src not in USED]
+    if dead:
+        print(f"  {len(dead)} map entries matched nothing:")
+        for src in dead:
+            print(f"    {src!r}")
+        problems += 1
+    return 1 if problems else 0
 
 
 if __name__ == "__main__":

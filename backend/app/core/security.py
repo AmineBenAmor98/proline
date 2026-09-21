@@ -36,6 +36,19 @@ def _unb64(value: str) -> bytes:
     return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
 
+def _same(left: str, right: str) -> bool:
+    """Constant-time comparison that survives an accent.
+
+    `hmac.compare_digest` raises TypeError on str arguments containing anything
+    outside ASCII -- so an admin password with an é in it made every sign-in a
+    500, including the correct one, and a header byte above 0x7f (Starlette
+    decodes headers as latin-1) made every admin endpoint a 500 for anyone who
+    sent one. Comparing the UTF-8 bytes has neither problem and is the same
+    comparison.
+    """
+    return hmac.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
+
+
 def create_token(username: str, settings: Settings) -> str:
     payload = json.dumps({"u": username, "exp": int(time.time()) + TOKEN_TTL_SECONDS}).encode()
     body = _b64(payload)
@@ -48,7 +61,7 @@ def verify_token(token: str, settings: Settings) -> str | None:
         payload = _unb64(body)
     except (ValueError, TypeError):
         return None
-    if not hmac.compare_digest(signature, _sign(payload, settings.secret_key)):
+    if not _same(signature, _sign(payload, settings.secret_key)):
         return None
     try:
         data = json.loads(payload)
@@ -61,8 +74,8 @@ def verify_token(token: str, settings: Settings) -> str | None:
 
 def check_credentials(username: str, password: str, settings: Settings) -> bool:
     """Constant-time on both fields, so timing says nothing about either."""
-    user_ok = hmac.compare_digest(username.strip(), settings.admin_username)
-    password_ok = hmac.compare_digest(password, settings.admin_password)
+    user_ok = _same(username.strip(), settings.admin_username)
+    password_ok = _same(password, settings.admin_password)
     return user_ok and password_ok
 
 

@@ -26,6 +26,7 @@ from app.schemas.rate_card import (
     Scenario,
     ScenarioResult,
 )
+from app.services.presets import STANDARD_MODIFIERS
 from app.services.rate_cards import (
     draft_to_pricing_data,
     get_active_rate_card,
@@ -67,26 +68,41 @@ async def read_history(session: AsyncSession = Depends(get_session)) -> RateCard
     return RateCardList(items=[_out(card, priced) for card, priced in rows])
 
 
-def _score(scenario: Scenario, card_data) -> tuple[int | None, list[dict], str | None]:
+def _score(scenario: Scenario, card_data) -> tuple[dict | None, str | None]:
+    """The whole breakdown, not just the total: the tester shows its arithmetic."""
     try:
         breakdown = price_request(
             PricingInput(
-                audience=scenario.audience,
-                property_type=scenario.property_type,
+                audience=scenario.audience.value,
+                property_type=scenario.property_type.value,
                 area_sqft=scenario.area_sqft,
                 bedrooms=scenario.bedrooms,
                 bathrooms=scenario.bathrooms,
                 restrooms=scenario.restrooms,
-                services=tuple(scenario.services),
-                extras=tuple(scenario.extras),
-                frequency=scenario.frequency,
+                services=tuple(code.value for code in scenario.services),
+                extras=dict(scenario.extras),
+                modifiers=dict(scenario.modifiers),
+                frequency=scenario.frequency.value,
                 night_access=scenario.night_access,
             ),
             card_data,
         )
     except PricingError as error:
-        return None, [], str(error)
-    return breakdown.total_cents, breakdown.as_dict()["lines"], None
+        return None, str(error)
+    return breakdown.as_dict(), None
+
+
+@router.get("/rate-card/modifier-presets")
+async def modifier_presets() -> dict[str, dict]:
+    """The standard questions, for a card that has none.
+
+    A card seeded before modifiers existed carries no questions, so the section
+    is an empty box and the form asks nothing -- and building four questions by
+    hand, each with two or three answers in two languages, is enough friction
+    that the feature goes unused. These are starting values: the admin edits them
+    like any other, and publishing is still an explicit act.
+    """
+    return STANDARD_MODIFIERS
 
 
 @router.post("/rate-card/preview", response_model=PreviewOut)
@@ -104,14 +120,19 @@ async def preview(
 
     results = []
     for scenario in payload.scenarios:
-        draft_total, draft_lines, error = _score(scenario, draft_data)
-        active_total = _score(scenario, active_data)[0] if active_data else None
+        draft, error = _score(scenario, draft_data)
+        active = _score(scenario, active_data)[0] if active_data else None
         results.append(
             ScenarioResult(
                 label=scenario.label,
-                active_total_cents=active_total,
-                draft_total_cents=draft_total,
-                draft_lines=draft_lines,
+                active_total_cents=active["total_cents"] if active else None,
+                draft_total_cents=draft["total_cents"] if draft else None,
+                draft_lines=draft["lines"] if draft else [],
+                draft_subtotal_cents=draft["subtotal_cents"] if draft else None,
+                draft_discount_cents=draft["discount_cents"] if draft else 0,
+                draft_minimum_adjustment_cents=(
+                    draft["minimum_adjustment_cents"] if draft else 0
+                ),
                 error=error,
             )
         )

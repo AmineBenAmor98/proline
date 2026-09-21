@@ -12,8 +12,12 @@ class Quote(TimestampedBase):
 
     __tablename__ = "quotes"
 
+    # Unique: the code assumes one quote per request -- the admin patch reads it
+    # with .first() and updates in place, the list outer-joins on it -- so the
+    # database says so too, rather than leaving it to whoever writes the next
+    # query.
     request_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("quote_requests.id", ondelete="CASCADE")
+        ForeignKey("quote_requests.id", ondelete="CASCADE"), unique=True, index=True
     )
     rate_card_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("rate_cards.id"))
 

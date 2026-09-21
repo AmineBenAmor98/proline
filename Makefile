@@ -33,5 +33,6 @@ psql:
 test: ## Full suite inside the container, against the compose database
 	$(COMPOSE) exec app sh -c "pip install -q -r requirements-dev.txt && pytest -q"
 
-lint:
-	cd backend && ruff check app tests scripts
+
+lint: ## Ruff, configured in backend/pyproject.toml
+	cd backend && ruff check .

@@ -23,8 +23,9 @@ def _pricing_input(payload: QuoteRequestIn | PriceDraftIn) -> PricingInput:
         floors=prop.floors,
         restrooms=prop.restrooms,
         frequency=payload.frequency.value,
-        services=tuple(payload.services),
-        extras=tuple(payload.extras),
+        services=tuple(code.value for code in payload.services),
+        extras=dict(payload.extras),
+        modifiers=dict(payload.modifiers),
         night_access=payload.night_access,
     )
 
@@ -101,10 +102,14 @@ async def create_quote_request(
         services=payload.services,
         frequency=payload.frequency,
         extras=payload.extras,
+        modifiers=payload.modifiers,
         desired_start=payload.desired_start,
         access_notes=payload.access_notes,
         night_access=payload.night_access,
-        status=RequestStatus.priced if breakdown else RequestStatus.new,
+        # Always `new`, priced or not. Whether the calculator produced a number
+        # is `computed_total_cents`, one line below, and the admin shows it as
+        # the number. A status is about what a person still owes the client.
+        status=RequestStatus.new,
         rate_card_id=rate_card_id,
         computed_total_cents=breakdown.total_cents if breakdown else None,
         computed_breakdown=breakdown.as_dict() if breakdown else None,

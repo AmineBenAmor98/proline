@@ -47,9 +47,9 @@
   </div>
 
   <main class="container admin-wrap">
-    <div class="section-head" style="margin-bottom:22px">
+    <div class="section-head">
       <span class="eyebrow">Tarifs</span>
-      <h1 style="font-size:2rem">La grille qui chiffre chaque demande.</h1>
+      <h1>La grille qui chiffre chaque demande.</h1>
       <p class="lead">Publier crée une nouvelle version. Les demandes déjà chiffrées gardent la leur.</p>
     </div>
 
@@ -66,8 +66,12 @@
       </div>
 
       <div class="rate-layout">
-        <div>
-          <div class="rate-box">
+        <!-- The rail. Every entry has a section behind it: it grows as each
+             phase lands, rather than listing rooms that are still empty. -->
+        <nav class="rail" id="rail" aria-label="Sections des tarifs"></nav>
+
+        <div class="rate-col">
+          <div class="rate-box" data-section="res-grid">
             <h2>Résidentiel — prix de base</h2>
             <p class="note">Prix ferme affiché au client, par visite, taxes en sus. Une case vide n'est pas offerte en ligne : la demande est chiffrée à la main.</p>
             <div style="overflow-x:auto">
@@ -76,7 +80,7 @@
             <div id="matrix-warnings"></div>
           </div>
 
-          <div class="rate-box">
+          <div class="rate-box" data-section="res-area" hidden>
             <h2>Résidentiel — superficie</h2>
             <div class="pair-row">
               <div><label for="f-allowance">Superficie incluse</label><p class="note">Au-delà, le supplément s'applique.</p></div>
@@ -88,7 +92,7 @@
             </div>
           </div>
 
-          <div class="rate-box">
+          <div class="rate-box" data-section="com-rates" hidden>
             <h2>Commercial — cadences</h2>
             <p class="note">Jamais montré au client : sert à préparer votre soumission écrite.</p>
             <div class="pair-row">
@@ -106,7 +110,7 @@
             </div>
           </div>
 
-          <div class="rate-box">
+          <div class="rate-box" data-section="gen-minimum" hidden>
             <h2>Minimum et déplacement</h2>
             <div class="pair-row">
               <div><label for="f-minimum">Visite minimum</label><p class="note">Aucune visite n'est facturée sous ce montant.</p></div>
@@ -118,13 +122,38 @@
             </div>
           </div>
 
-          <div class="rate-box">
-            <h2>Extras et fréquence</h2>
+          <div class="rate-box" data-section="res-modifiers" hidden>
+            <h2>Modificateurs — résidentiel</h2>
+            <p class="note">Deux logements de trois chambres ne demandent pas le même travail.
+              Un modificateur est une question posée au client — « est-ce un premier ménage ? » —
+              dont la réponse ajuste le prix.</p>
+            <div id="modifier-rows"></div>
+            <!-- Hidden until something multiplies: a ceiling on nothing is a
+                 setting nobody can interpret. -->
+            <div class="pair-row" id="maxmult-row" hidden>
+              <div><label for="f-maxmult">Plafond des multiplicateurs</label>
+                <p class="note">Les multiplicateurs se composent : un premier ménage d'un
+                  logement vide et très sale atteint déjà × 2,33. Le produit ne dépasse
+                  jamais ce plafond.</p></div>
+              <input id="f-maxmult" data-kind="decimal" inputmode="decimal">
+            </div>
+          </div>
+
+          <div class="rate-box" data-section="res-extras" hidden>
+            <h2>Extras</h2>
+            <p class="note">Ajoutés après les modificateurs et jamais multipliés par eux :
+              un prix à l'unité suit déjà sa quantité.</p>
             <div id="extras-rows"></div>
+          </div>
+
+          <div class="rate-box" data-section="gen-frequency" hidden>
+            <h2>Rabais de fréquence</h2>
+            <p class="note">Appliqué à toute la visite, extras compris — c'est ce qu'un client
+              récurrent comprend par « rabais ».</p>
             <div id="discount-rows"></div>
           </div>
 
-          <div class="rate-box">
+          <div class="rate-box" data-section="history" hidden>
             <h2>Versions publiées</h2>
             <div id="history"><p class="note">…</p></div>
           </div>
@@ -144,8 +173,8 @@
 
 <!-- Review and publish -->
 <div class="modal" id="review" hidden>
-  <div class="modal-card">
-    <h2 style="font-size:1.25rem">Réviser et publier</h2>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="review-title" tabindex="-1">
+    <h2 style="font-size:1.25rem" id="review-title">Réviser et publier</h2>
     <p class="note" id="review-intro">Cette publication crée une nouvelle version. Les demandes déjà chiffrées gardent la leur.</p>
     <div id="review-changes"></div>
     <div id="review-effect"></div>

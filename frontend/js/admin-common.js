@@ -9,9 +9,12 @@ window.ProlineAdmin = (function () {
 
   /* Shared vocabulary. Defined once here because both admin screens render the
      same words, and two copies drifted apart the first time they existed. */
+  /* Four states, in workflow order. `priced` and `enriching` are gone: the first
+     restated "the calculator produced a number", which the Prix calculé column
+     already shows, and nothing ever set the second. */
+  var STATUS_ORDER = ["new", "quoted", "won", "lost"];
   var STATUS_LABELS = {
-    new: "Nouvelle", enriching: "Analyse", priced: "Chiffrée",
-    quoted: "Envoyée", won: "Gagnée", lost: "Perdue"
+    new: "Nouvelle", quoted: "Envoyée", won: "Gagnée", lost: "Perdue"
   };
   var FREQUENCY_LABELS = {
     one_time: "Une seule fois", weekly: "Chaque semaine", biweekly: "Aux 2 semaines",
@@ -21,6 +24,15 @@ window.ProlineAdmin = (function () {
     house: "Maison", condo: "Condo", apartment: "Appartement", office: "Bureau",
     retail: "Commerce", building: "Immeuble", industrial: "Industriel",
     construction: "Chantier"
+  };
+
+  /* Commercial services. Extras are NOT listed here on purpose: they live on the
+     rate card, which carries their wording, and a second copy would drift. */
+  var SERVICE_LABELS = {
+    residential_cleaning: "Ménage résidentiel", office_cleaning: "Bureaux",
+    common_areas: "Aires communes", post_construction: "Post-construction",
+    end_of_lease: "Fin de bail", floor_stripping_waxing: "Décapage et cirage",
+    carpets: "Tapis", windows: "Vitres", disinfection: "Désinfection"
   };
 
   function session() {
@@ -134,12 +146,17 @@ window.ProlineAdmin = (function () {
     var panel = document.getElementById("panel");
     if (login) login.hidden = false;
     if (panel) panel.hidden = true;
-    document.body.classList.add("admin-body");
     var box = document.getElementById("login-error");
     if (box) {
       box.textContent = message || "";
       box.hidden = !message;
     }
+    /* A session can expire mid-action: the panel vanishes and this form takes
+       its place. Without moving the focus, a screen-reader user is left reading
+       a page that silently changed under them. (`autofocus` does not fire here:
+       the markup is injected after load.) */
+    var field = document.getElementById("username");
+    if (field && field.focus) field.focus();
   }
 
   function showPanel() {
@@ -175,18 +192,55 @@ window.ProlineAdmin = (function () {
       }
       if (res.status === 204) return null;
       return res.json();
+    }, function () {
+      /* fetch rejects only when the request never got an answer: the server is
+         not running, or the network went away. Without this it arrived in the
+         catch as a TypeError and every screen said "Erreur inattendue." */
+      return Promise.reject({ status: 0, body: null });
     });
   }
 
-  /* Pydantic reports a list of errors; show the first one in words. */
+  /* What went wrong, in French, and what to do about it.
+
+     This used to pass FastAPI's `detail` straight through, so a dead database
+     put "Internal Server Error" on a French admin page and the screen it was
+     driving came up blank. A person reading that learns nothing; the thing they
+     need to know is that the server is not answering. */
+  var STATUS_MESSAGES = {
+    0: "Le serveur ne répond pas. Vérifiez qu'il est démarré, puis rafraîchissez.",
+    500: "Le serveur a répondu par une erreur. La base de données est-elle démarrée ?",
+    502: "Le serveur ne répond pas. Vérifiez qu'il est démarré, puis rafraîchissez.",
+    503: "Le serveur ne répond pas. Vérifiez qu'il est démarré, puis rafraîchissez.",
+    504: "Le serveur a mis trop de temps à répondre. Réessayez."
+  };
+
   function apiMessage(error) {
     if (!error || typeof error !== "object") return "Erreur inattendue.";
+    /* A thrown Error is not a failed request. This used to fall all the way to
+       the bottom and come back as "Erreur " -- the word, a space, and an empty
+       status -- which told Amine nothing except that something had gone wrong
+       somewhere. A bug in the page is worth naming as such, and worth logging
+       with its stack, because the screen it is about to break is not the one
+       that failed. */
+    if (error instanceof Error) {
+      if (window.console && console.error) console.error(error);
+      return "Erreur dans la page, pas sur le serveur. Rafraîchissez ; " +
+        "si cela recommence, la console du navigateur en a le détail.";
+    }
+    if (STATUS_MESSAGES[error.status]) return STATUS_MESSAGES[error.status];
+
+    /* Pydantic reports a list of errors; show the first one in words. These are
+       worth passing through -- they say which field is wrong. */
     var detail = error.body && error.body.detail;
     if (typeof detail === "string") return detail;
     if (Array.isArray(detail) && detail.length) {
       return String(detail[0].msg || "").replace(/^Value error,\s*/, "");
     }
-    return "Erreur " + (error.status || "");
+    /* Never "Erreur " with nothing after it: without a status there is no status
+       to show, and the number alone was never the useful part anyway. */
+    return error.status
+      ? "Le serveur a refusé la demande (erreur " + error.status + ")."
+      : "Erreur inattendue. Rafraîchissez et réessayez.";
   }
 
   function boot(options) {
@@ -244,8 +298,8 @@ window.ProlineAdmin = (function () {
   }
 
   return {
-    STATUS_LABELS: STATUS_LABELS, FREQUENCY_LABELS: FREQUENCY_LABELS,
-    PROPERTY_LABELS: PROPERTY_LABELS,
+    STATUS_LABELS: STATUS_LABELS, STATUS_ORDER: STATUS_ORDER, FREQUENCY_LABELS: FREQUENCY_LABELS,
+    PROPERTY_LABELS: PROPERTY_LABELS, SERVICE_LABELS: SERVICE_LABELS,
     boot: boot, api: api, apiMessage: apiMessage,
     money: money, moneyExact: moneyExact, parseMoney: parseMoney,
     parseIntStrict: parseIntStrict, parseDecimalStrict: parseDecimalStrict,

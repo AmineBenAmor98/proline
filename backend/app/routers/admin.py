@@ -6,12 +6,19 @@ prefix and the same token.
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
-from app.core.security import TOKEN_TTL_SECONDS, check_credentials, create_token, require_admin
+from app.core.security import (
+    TOKEN_TTL_SECONDS,
+    check_credentials,
+    create_token,
+    require_admin,
+)
 from app.db.session import get_session
 from app.models import Lead, Property, Quote, QuoteRequest
 from app.models.enums import RequestStatus
@@ -21,7 +28,9 @@ from app.schemas.admin import (
     AdminRequestRow,
     LoginIn,
     LoginOut,
+    RequestedItem,
 )
+from app.services.rate_cards import get_active_rate_card
 
 # Sign-in is public; everything else needs the token it returns.
 public_router = APIRouter(prefix="/admin", tags=["admin"])
@@ -45,7 +54,71 @@ async def me(username: str = Depends(require_admin)) -> dict[str, str]:
     return {"username": username}
 
 
-def _row(request: QuoteRequest, lead: Lead, prop: Property, quoted: int | None) -> AdminRequestRow:
+def _extras(request: QuoteRequest, card_extras: dict) -> list[RequestedItem]:
+    """The extras asked for, named.
+
+    The breakdown stored on the request is preferred: it holds the exact words
+    and quantities the visitor was quoted. A request nobody priced -- every
+    commercial one -- falls back to the active card, and finally to the code, so
+    an extra retired from the card still reads as something.
+    """
+    priced = {}
+    for line in ((request.computed_breakdown or {}).get("lines") or []):
+        code = str(line.get("code", ""))
+        if code.startswith("extra:"):
+            priced[code[6:]] = line
+
+    out: list[RequestedItem] = []
+    for code, quantity in sorted((request.extras or {}).items()):
+        line = priced.get(code)
+        spec = card_extras.get(code) or {}
+        if not isinstance(spec, dict):  # a card written before units existed
+            spec = {}
+        label = (line or {}).get("label_fr") or spec.get("label_fr") or code
+        unit = (line or {}).get("unit_fr") or spec.get("per_fr") or ""
+        shown = (line or {}).get("quantity")
+        if shown is None and spec.get("unit") == "each":
+            shown = quantity
+        out.append(RequestedItem(code=code, label=label, quantity=shown, unit=unit))
+    return out
+
+
+def _modifiers(request: QuoteRequest, card_modifiers: dict) -> list[RequestedItem]:
+    """The answers, named. Resolved from the active card, because unlike an extra
+    a modifier has no line of its own in the breakdown when it is a multiplier --
+    those are combined into one. The code and the answer are the request's own."""
+    out: list[RequestedItem] = []
+    chosen = request.modifiers or {}
+    ordered = sorted(
+        ((code, spec) for code, spec in (card_modifiers or {}).items() if code in chosen),
+        key=lambda pair: (pair[1].get("sort", 100), pair[0]),
+    )
+    for code, spec in ordered:
+        option = next(
+            (o for o in spec.get("options", []) if o.get("value") == chosen.get(code)), None
+        )
+        if option is None or (
+            str(option.get("multiplier", "1")) in ("1", "1.0") and not option.get("cents")
+        ):
+            continue  # the free answer: nothing happened, nothing to report
+        name = spec.get("short_fr") or spec.get("label_fr") or code
+        out.append(RequestedItem(code=code, label=f"{name} : {option.get('label_fr', '')}"))
+
+    # An answer the active card no longer defines still happened.
+    for code, value in sorted(chosen.items()):
+        if code not in (card_modifiers or {}):
+            out.append(RequestedItem(code=code, label=f"{code} : {value}"))
+    return out
+
+
+def _row(
+    request: QuoteRequest,
+    lead: Lead,
+    prop: Property,
+    quoted: int | None,
+    card_extras: dict | None = None,
+    card_modifiers: dict | None = None,
+) -> AdminRequestRow:
     return AdminRequestRow(
         id=str(request.id),
         created_at=request.created_at,
@@ -62,9 +135,18 @@ def _row(request: QuoteRequest, lead: Lead, prop: Property, quoted: int | None) 
         bedrooms=prop.bedrooms,
         bathrooms=prop.bathrooms,
         restrooms=prop.restrooms,
+        floors=prop.floors,
+        address_line=prop.address_line,
+        postal_code=prop.postal_code,
         city=prop.city,
         borough=prop.borough,
         access_notes=request.access_notes,
+        desired_start=request.desired_start,
+        preferred_contact=lead.preferred_contact,
+        night_access=request.night_access,
+        services=list(request.services or []),
+        extras=_extras(request, card_extras or {}),
+        modifiers=_modifiers(request, card_modifiers or {}),
         computed_total_cents=request.computed_total_cents,
         quoted_total_cents=quoted,
         utm_campaign=lead.utm_campaign,
@@ -100,8 +182,17 @@ async def list_requests(
     )
     total = sum(counts.values())
 
+    # One card read for the whole page, so naming an extra costs no query per row.
+    active = await get_active_rate_card(session)
+    grid = (active.grid or {}) if active else {}
+    card_extras = grid.get("extras", {})
+    card_modifiers = grid.get("residential_modifiers", {})
+
     return AdminRequestList(
-        items=[_row(request, lead, prop, quoted) for request, lead, prop, quoted in rows],
+        items=[
+            _row(request, lead, prop, quoted, card_extras, card_modifiers)
+            for request, lead, prop, quoted in rows
+        ],
         total=total,
         counts_by_status={status.value: count for status, count in counts.items()},
     )
@@ -109,7 +200,9 @@ async def list_requests(
 
 @router.patch("/requests/{request_id}", response_model=AdminRequestRow)
 async def update_request(
-    request_id: str,
+    # Typed as a UUID so a malformed id is a 422 from FastAPI. As a plain str it
+    # reached asyncpg's UUID codec and came back as an unhandled 500.
+    request_id: UUID,
     payload: AdminRequestPatch,
     session: AsyncSession = Depends(get_session),
 ) -> AdminRequestRow:
@@ -127,27 +220,38 @@ async def update_request(
     if payload.status:
         request.status = payload.status
 
-    quoted_total = None
-    if payload.quoted_total_cents is not None:
-        quote = (
-            await session.execute(select(Quote).where(Quote.request_id == request.id))
-        ).scalars().first()
+    quote = (
+        await session.execute(select(Quote).where(Quote.request_id == request.id))
+    ).scalars().first()
+
+    # Notes used to be read only inside the price branch, so
+    # PATCH {"notes": "rappelle lundi"} answered 200 and wrote nothing.
+    if payload.quoted_total_cents is not None or payload.notes is not None:
         if quote is None:
             quote = Quote(
                 request_id=request.id,
                 rate_card_id=request.rate_card_id,
-                total_cents=payload.quoted_total_cents,
+                total_cents=payload.quoted_total_cents or 0,
                 notes=payload.notes,
             )
             session.add(quote)
         else:
-            quote.total_cents = payload.quoted_total_cents
+            if payload.quoted_total_cents is not None:
+                quote.total_cents = payload.quoted_total_cents
             if payload.notes is not None:
                 quote.notes = payload.notes
-        quoted_total = payload.quoted_total_cents
-        if request.status == RequestStatus.new or request.status == RequestStatus.priced:
-            request.status = RequestStatus.quoted
+
+    # Sending a price is what moves a request out of the inbox. Only from `new`:
+    # correcting the number on a request already won must not walk it backwards.
+    if payload.quoted_total_cents is not None and request.status is RequestStatus.new:
+        request.status = RequestStatus.quoted
 
     await session.commit()
     await session.refresh(request)
-    return _row(request, lead, prop, quoted_total)
+
+    active = await get_active_rate_card(session)
+    grid = (active.grid or {}) if active else {}
+    return _row(
+        request, lead, prop, quote.total_cents if quote else None,
+        grid.get("extras", {}), grid.get("residential_modifiers", {}),
+    )

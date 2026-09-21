@@ -2,3 +2,6 @@
 pytest==9.1.1
 pytest-asyncio==1.4.0
 ruff==0.16.8
+# The suite creates, migrates and truncates its own database (tests/conftest.py).
+# asyncpg cannot CREATE DATABASE outside a transaction, so the fixtures use psycopg.
+psycopg[binary]==3.3.6

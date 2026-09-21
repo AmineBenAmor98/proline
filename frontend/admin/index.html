@@ -37,9 +37,9 @@
   </header>
 
   <main class="container admin-wrap">
-    <div class="section-head" style="margin-bottom:24px">
+    <div class="section-head">
       <span class="eyebrow">Demandes</span>
-      <h1 style="font-size:2rem">Boîte de réception</h1>
+      <h1>Boîte de réception</h1>
     </div>
 
     <div class="stat-row" id="stats"></div>
@@ -47,7 +47,6 @@
     <div class="choice-row" style="margin-bottom:20px" id="filters">
       <label class="choice"><input type="radio" name="status" value="" checked> Toutes</label>
       <label class="choice"><input type="radio" name="status" value="new"> Nouvelles</label>
-      <label class="choice"><input type="radio" name="status" value="priced"> Chiffrées</label>
       <label class="choice"><input type="radio" name="status" value="quoted"> Envoyées</label>
       <label class="choice"><input type="radio" name="status" value="won"> Gagnées</label>
       <label class="choice"><input type="radio" name="status" value="lost"> Perdues</label>
@@ -67,7 +66,7 @@
         <tbody></tbody>
       </table>
     </div>
-    <p class="note" style="margin-top:14px">Le prix envoyé se sauvegarde quand vous quittez le champ. Le statut passe automatiquement à « Envoyée ».</p>
+    <p class="note" style="margin-top:14px">Le prix envoyé se sauvegarde quand vous quittez le champ, et fait passer une demande « Nouvelle » à « Envoyée ».</p>
   </main>
 </div>
 

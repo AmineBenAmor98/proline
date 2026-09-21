@@ -8,32 +8,73 @@ from app.core.config import Settings
 from app.core.logging import logger
 
 
+async def _send_email(
+    client: httpx.AsyncClient, settings: Settings, request_id: str, summary: str
+) -> httpx.Response:
+    return await client.post(
+        "https://api.resend.com/emails",
+        headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+        json={
+            "from": settings.notify_email_from,
+            "to": [settings.notify_email_to],
+            "subject": f"Nouvelle demande de soumission — {request_id[:8]}",
+            "text": summary,
+        },
+    )
+
+
+async def _send_sms(
+    client: httpx.AsyncClient, settings: Settings, request_id: str, summary: str
+) -> httpx.Response:
+    return await client.post(
+        f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Messages.json",
+        auth=(settings.twilio_account_sid, settings.twilio_auth_token),
+        data={
+            "From": settings.twilio_from,
+            "To": settings.notify_sms_to,
+            "Body": f"Proline: nouvelle demande {request_id[:8]}. {summary[:120]}",
+        },
+    )
+
+
 async def notify_new_request(settings: Settings, *, request_id: str, summary: str) -> None:
+    """Best effort, and loudly logged when it fails.
+
+    The request is already saved by the time we get here, so a provider outage
+    must never surface as a failed submission — but it must not vanish either:
+    a channel that raises is logged with its name so the lead can be chased.
+    """
     if not settings.notifications_enabled:
         logger.info("notification.skipped", request_id=request_id, summary=summary)
         return
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        if settings.resend_api_key and settings.notify_email_to:
-            await client.post(
-                "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
-                json={
-                    "from": settings.notify_email_from,
-                    "to": [settings.notify_email_to],
-                    "subject": f"Nouvelle demande de soumission — {request_id[:8]}",
-                    "text": summary,
-                },
-            )
+    channels = []
+    if settings.resend_api_key and settings.notify_email_to:
+        channels.append(("email", _send_email))
+    if settings.twilio_account_sid and settings.notify_sms_to:
+        channels.append(("sms", _send_sms))
 
-        if settings.twilio_account_sid and settings.notify_sms_to:
-            await client.post(
-                f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Messages.json",
-                auth=(settings.twilio_account_sid, settings.twilio_auth_token),
-                data={
-                    "From": settings.twilio_from,
-                    "To": settings.notify_sms_to,
-                    "Body": f"Proline: nouvelle demande {request_id[:8]}. {summary[:120]}",
-                },
-            )
-    logger.info("notification.sent", request_id=request_id)
+    sent, failed = [], []
+    async with httpx.AsyncClient(timeout=10) as client:
+        for name, send in channels:
+            try:
+                response = await send(client, settings, request_id, summary)
+                # A 401 from Resend is a failure even though the POST succeeded.
+                response.raise_for_status()
+            except Exception as exc:  # provider outage, DNS, timeout
+                failed.append(name)
+                logger.error(
+                    "notification.failed",
+                    request_id=request_id,
+                    channel=name,
+                    error=str(exc),
+                    summary=summary,
+                )
+            else:
+                sent.append(name)
+
+    if sent:
+        logger.info("notification.sent", request_id=request_id, channels=sent)
+    if failed and not sent:
+        # Nobody was told at all: the summary goes to the log so the lead survives.
+        logger.error("notification.undelivered", request_id=request_id, summary=summary)

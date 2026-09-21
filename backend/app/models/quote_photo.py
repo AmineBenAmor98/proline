@@ -21,7 +21,8 @@ class QuotePhoto(TimestampedBase):
     storage_key: Mapped[str] = mapped_column(String(400), nullable=False)
     bytes_size: Mapped[int | None] = mapped_column(Integer)
 
-    detections: Mapped[dict | None] = mapped_column(JSONB)
+    # See quote_request.computed_breakdown: a Python None has to reach SQL as NULL.
+    detections: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True))
     confidence: Mapped[int | None] = mapped_column(Integer)  # 0-100
     corrected_by_human: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

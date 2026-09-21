@@ -5,17 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Get a price — Proline Cleaning Solutions</title>
 <meta name="description" content="Get your home cleaning price online, or your written commercial quote within 24 hours. Montreal.">
-<link rel="canonical" href="https://prolinesolutions.ca/soumission">
+<link rel="canonical" href="https://prolinesolutions.ca/en/soumission">
 <link rel="alternate" hreflang="fr-ca" href="https://prolinesolutions.ca/soumission">
 <link rel="alternate" hreflang="en-ca" href="https://prolinesolutions.ca/en/soumission">
+<link rel="alternate" hreflang="x-default" href="https://prolinesolutions.ca/soumission">
 <link rel="icon" href="/img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Karla:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Karla:wght@400;500;600&display=swap"
+      media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Karla:wght@400;500;600&display=swap"></noscript>
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_CA">
+<meta property="og:title" content="Get a price — Proline Cleaning Solutions">
+<meta property="og:description" content="Your price online in two minutes for a home, a written quote within 24 hours for a commercial space.">
+<meta property="og:image" content="https://prolinesolutions.ca/img/og-share.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="628">
+<meta property="og:url" content="https://prolinesolutions.ca/en/soumission">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="/css/app.css">
 </head>
 <body data-locale="en">
 <div class="goldbar"></div>
+<!-- One polite region for the page. The summary aside used to carry aria-live
+     itself, so every debounced price update re-read the heading, every line
+     item, the disclaimer and the phone number, and the sticky bar announced the
+     price a second time on a phone. -->
+<p class="hp" id="announce" role="status" aria-live="polite"></p>
 
 <header class="site-header">
   <div class="container">
@@ -59,10 +76,11 @@
           </nav>
 
           <!-- Step 1 -->
-          <fieldset class="wizard-step" data-step="1">
+          <fieldset class="wizard-step" data-step="1" tabindex="-1">
             <div class="field">
-              <span class="field-label">What kind of place is it?</span>
-              <div class="typegroups" id="typegroups">
+              <span class="field-label" id="lbl-property-type">What kind of place is it?</span>
+              <div class="typegroups" id="typegroups" role="radiogroup"
+                   aria-labelledby="lbl-property-type" aria-describedby="err-property_type">
         <div class="typegroup" data-group="residential">
           <span class="typegroup-label">Residential</span>
           <div class="tiles">
@@ -120,7 +138,9 @@
             <div class="field-group">
               <div class="field">
                 <label for="area_sqft">Approximate area (sq ft)</label>
-                <input type="number" id="area_sqft" name="area_sqft" min="100" max="1000000" inputmode="numeric" placeholder="1200">
+                <input type="number" id="area_sqft" name="area_sqft" min="100" max="1000000"
+                       inputmode="numeric" placeholder="1200" required
+                       aria-describedby="err-area_sqft">
                 <p class="field-error" id="err-area_sqft" role="alert" hidden></p>
               </div>
             </div>
@@ -133,9 +153,13 @@
                 </div>
                 <div class="field">
                   <label for="bathrooms">Bathrooms</label>
-                  <select id="bathrooms" name="bathrooms"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+                  <select id="bathrooms" name="bathrooms" aria-describedby="rooms-note"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
                 </div>
               </div>
+              <!-- Filled by quote.js when the rate card prices only some of the
+                   combinations, so a greyed-out option is explained rather than
+                   just unavailable. -->
+              <p class="note" id="rooms-note" hidden></p>
             </div>
 
             <div data-when="commercial" hidden>
@@ -158,7 +182,7 @@
           </fieldset>
 
           <!-- Step 2 -->
-          <fieldset class="wizard-step" data-step="2" hidden>
+          <fieldset class="wizard-step" data-step="2" tabindex="-1" hidden>
             <div class="field">
               <span class="field-label">Frequency</span>
               <div class="choice-row">
@@ -181,19 +205,22 @@
               </div>
             </div>
 
+            <!-- The questions that change the price, rendered from
+                 /api/quotes/form-config. A card with none asks none. -->
+            <div data-when="residential" id="modifiers"></div>
+
             <div class="field" data-when="residential">
               <span class="field-label">Extras</span>
-              <div class="choice-row">
-                <label class="choice"><input type="checkbox" name="extras" value="fridge"> Inside the fridge</label>
-                <label class="choice"><input type="checkbox" name="extras" value="oven"> Inside the oven</label>
-                <label class="choice"><input type="checkbox" name="extras" value="windows"> Interior windows</label>
-              </div>
+              <!-- Filled from /api/quotes/form-config: the form offers exactly what
+                   the active rate card can price, never a hard-coded list. -->
+              <div class="extras" id="extras" role="group" aria-label="Extras"></div>
             </div>
 
             <div class="field-group">
               <div class="field">
                 <label for="desired_start">Preferred start</label>
-                <input type="date" id="desired_start" name="desired_start">
+                <input type="date" id="desired_start" name="desired_start" aria-describedby="err-desired_start">
+                <p class="field-error" id="err-desired_start" role="alert" hidden></p>
               </div>
             </div>
 
@@ -209,11 +236,12 @@
           </fieldset>
 
           <!-- Step 3 -->
-          <fieldset class="wizard-step" data-step="3" hidden>
+          <fieldset class="wizard-step" data-step="3" tabindex="-1" hidden>
             <div class="field-group">
               <div class="field">
                 <label for="full_name">Full name *</label>
-                <input type="text" id="full_name" name="full_name" autocomplete="name" required>
+                <input type="text" id="full_name" name="full_name" autocomplete="name" required
+                       aria-describedby="err-full_name">
                 <p class="field-error" id="err-full_name" role="alert" hidden></p>
               </div>
               <div class="field">
@@ -222,11 +250,13 @@
               </div>
               <div class="field">
                 <label for="email">Email</label>
-                <input type="email" id="email" name="email" autocomplete="email">
+                <input type="email" id="email" name="email" autocomplete="email"
+                       aria-describedby="err-contact">
               </div>
               <div class="field">
                 <label for="phone">Phone</label>
-                <input type="tel" id="phone" name="phone" autocomplete="tel">
+                <input type="tel" id="phone" name="phone" autocomplete="tel"
+                       aria-describedby="err-contact">
               </div>
             </div>
             <div class="field" style="margin-top:-8px">
@@ -235,7 +265,7 @@
             <p class="note" style="margin-bottom:18px">An email or a phone number is enough. We use whichever you prefer.</p>
 
             <label class="checkbox-row">
-              <input type="checkbox" name="consent_given" required>
+              <input type="checkbox" name="consent_given" required aria-describedby="err-consent_given">
               <span>I agree that this information may be used to answer my request.</span>
             </label>
             <p class="field-error" id="err-consent_given" role="alert" hidden></p>
@@ -262,14 +292,14 @@
 
       </div>
 
-      <div id="done" hidden class="cta" style="margin-top:32px">
+      <div id="done" hidden class="cta" role="status" tabindex="-1" style="margin-top:32px">
         <div>
           <h2 id="done-title"></h2>
           <p id="done-ref" class="note" style="color:#c6d5ec;margin-top:10px"></p>
         </div>
         <div class="row">
           <span class="price" id="done-price" hidden style="color:#fff"></span>
-          <a class="btn btn-gold" href="/en">Back à l'accueil</a>
+          <a class="btn btn-gold" href="/en">Back to home</a>
         </div>
       </div>
     </div>
@@ -280,7 +310,7 @@
   <div class="container">
     <div class="footer-bottom" style="border:0;margin:0;padding:0">
       <span>© 2026 Proline Cleaning Solutions · 514 242-4779</span>
-      <span><a href="/en">Home</a> · <a href="/en/commercial">Commercial</a> · <a href="/en/soumission">Français</a></span>
+      <span><a href="/en">Home</a> · <a href="/en/commercial">Commercial</a> · <a href="/soumission">Français</a></span>
     </div>
   </div>
 </footer>

@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# The wizard's own query strings are not separate pages.
+Disallow: /soumission?
+Disallow: /en/soumission?
+
+# Admin screens are gated by a token, but keep them out of the index anyway.
+Disallow: /admin
+Disallow: /admin/
+
+Sitemap: https://prolinesolutions.ca/sitemap.xml

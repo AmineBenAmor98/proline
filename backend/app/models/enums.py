@@ -41,10 +41,17 @@ class Frequency(str, enum.Enum):
 
 
 class RequestStatus(str, enum.Enum):
-    new = "new"
-    enriching = "enriching"
-    priced = "priced"
-    quoted = "quoted"
+    """Where a request stands with the client. Nothing else.
+
+    It used to also carry `priced` and `enriching`. `priced` was set on arrival
+    whenever the engine produced a number, which made it a restatement of
+    `computed_total_cents IS NULL` -- and meant a request nobody had opened
+    arrived already "Chiffrée", so the inbox had no unread state. `enriching` was
+    never set by anything.
+    """
+
+    new = "new"          # arrived, nobody has dealt with it
+    quoted = "quoted"    # a price was sent to the client
     won = "won"
     lost = "lost"
 

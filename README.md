@@ -57,18 +57,24 @@ uvicorn app.main:app --reload
 
 ```bash
 cd backend
-pytest                  # pricing engine + pages, no database needed
-DATABASE_URL=postgresql+asyncpg://proline:proline@localhost:5432/proline pytest
-ruff check app tests scripts
+pytest
+ruff check .
 ```
 
-The API tests skip themselves when `DATABASE_URL` is unset, so the suite still runs on a
-laptop with no Postgres.
+The suite owns its database. `DATABASE_URL` says which **server**; the tests run in a
+`<name>_test` database beside it, which `tests/conftest.py` creates, migrates from scratch
+and truncates-and-reseeds **before every test**. So running `pytest` twice gives the same
+answer as running it once, and no test can be made to pass by what an earlier one left
+behind. It does mean Postgres has to be up — `make up` is enough, and `make test` runs the
+suite inside the compose container.
+
+The schema under test is the one the migrations produce, never `create_all`, because a
+migration that is broken should fail here rather than on deploy.
 
 ## How pricing works
 
 `backend/app/pricing/` is pure functions: inputs in, a breakdown out. No database, no clock,
-no network, so its tests need nothing running.
+no network — so a pricing bug can always be reproduced in four lines, with no fixtures.
 
 - **Residential** — a flat grid by bedrooms and bathrooms, plus an area surcharge, priced
   extras and a recurring discount. Returned to the visitor as a firm price.
@@ -76,9 +82,107 @@ no network, so its tests need nothing running.
   restrooms, night access and travel. Computed and stored, **never shown**: the client is
   told a written quote arrives within 24 h, and a human reviews the number first.
 
+**The order is fixed and tested**, because it used to be wrong:
+
+```
+base + area                          →  the work
+work × modifiers (capped)            →  how hard this one is
+        + modifier amounts
+        + extras                     →  subtotal
+subtotal − frequency discount        →  what the client is charged
+floor at the minimum visit           →  total
+```
+
+A **modifier** is a question whose answer changes the price — *premier ménage*,
+*état*, *animaux*, *vide*. A multiplier scales the work; an amount is added after
+it, so two amounts never compound. Neither touches the extras, whose per-unit
+prices already scale with their own quantity. Multipliers compound with each
+other under `max_residential_multiplier`, and the line says `(plafonné)` when the
+ceiling bites. Questions, answers and prices all live on the rate card — adding a
+fifth question takes no code. See [`docs/PRICING-V2.md`](docs/PRICING-V2.md).
+
+The **minimum visit is last**. It is a promise about what the client pays, not about the
+arithmetic behind it. Applied before the discount — which is how it was — a weekly client
+on a 120 $ minimum was quoted **102 $**, and the discount was computed on the floor rather
+than on the work, inflating it as well. When the floor bites, the gap is reported as
+`minimum_adjustment_cents` and rendered as its own line, so `lines − discount + minimum`
+always equals the total. `test_the_breakdown_adds_up` holds that.
+
+**The engine never invents an input.** No price is better than a wrong one, because "we
+price this one by hand" is a sentence the form already knows how to say and a 409 the
+frontend already handles. So it refuses rather than guesses when:
+
+- a home is outside the grid (a studio, or eight bedrooms — it used to clamp to five and
+  quote a different house);
+- a bedroom/bathroom combination has no cell;
+- an extra is priced per 100 sq ft and the request gives no area (it used to charge zero
+  and the crew did the work for free);
+- a commercial request ticks no service (it used to be priced as office cleaning).
+
 Rate cards are versioned rows (`rate_cards`) — see the next section for how to change one.
 
+## The request list
+
+`/admin` is an inbox, so a status says where a request stands **with the client**,
+and nothing else:
+
+| | |
+|---|---|
+| **Nouvelle** | arrived, nobody has dealt with it |
+| **Envoyée** | a price was sent — set automatically when you fill *Prix envoyé* |
+| **Gagnée** / **Perdue** | how it ended |
+
+It used to hold two more. `priced` was set on arrival whenever the engine produced
+a number, which made it a second, worse copy of `computed_total_cents IS NULL` —
+in the database it was exactly that: 23 rows `priced`, all 23 with a price; 8 rows
+`new`, none with one. The cost was the inbox: a residential request that priced
+arrived already "Chiffrée", so one nobody had opened looked like one already
+handled, and "Nouvelles" listed only the requests the calculator had failed on.
+`enriching` was never set by anything. Neither survives.
+
+**Whether it priced is still on screen, and better:** the *Prix calculé* column
+shows the number, or says **à chiffrer** when there is none — which is the queue
+of requests needing a human price.
+
+Adding a state later (`en cours`, say, for a job being scheduled) is one migration.
+Note the enum friction under **The database** before you write it.
+
+## The database
+
+Six tables. `leads` → `properties` → `quote_requests` → `quotes`, plus `rate_cards`
+(versioned, never edited) and `quote_photos` (reserved for the AI-enrichment project;
+nothing writes it yet). Primary keys are uuid7, so they sort by creation time. All money
+is integer cents. All timestamps carry a timezone.
+
+Three rules the **database** enforces, rather than trusting whoever writes the next query:
+
+- **One active rate card.** `uq_rate_cards_one_active`, a unique index on `is_active`
+  where true. Every price on the site comes from `get_active_rate_card`, which takes the
+  first row — two active cards would make the price depend on row order.
+- **One quote per request.** The admin patch reads it with `.first()` and updates in
+  place; a second row would duplicate the request in the listing.
+- **A price is a price.** `computed_breakdown` is SQL NULL when a request got none. It
+  used to hold the JSON literal `null` (SQLAlchemy's JSON default), so
+  `computed_breakdown IS NOT NULL` answered yes for requests nobody could price. The
+  models pass `none_as_null=True` now.
+
+`leads`, `properties` and `quote_requests` are 1:1:1 today — every submission creates all
+three. The split is deliberate and stays: a repeat client with the same condo is the whole
+business model, and the join is two primary-key lookups. What is missing is the dedupe on
+submit, not a flatter schema.
+
+**Known friction:** `audience`, `property_type`, `frequency`, `request_status` and
+`photo_zone` are Postgres enum types. `ALTER TYPE ... ADD VALUE` cannot be used in the same
+transaction that adds it, and Alembic wraps each migration in one — so adding a status is
+two migrations, or one with `op.execute("COMMIT")` before the value is used. Worth knowing
+before Phase 6 adds a workflow state.
+
 ## Pricing: the rate card
+
+> The next version of this — per-unit extras, modifiers, commercial fixtures and
+> surfaces — is planned in [`docs/PRICING-V2.md`](docs/PRICING-V2.md). Read that
+> before changing the grid's shape.
+
 
 Every price the site shows comes from the **active rate card** row, read from the
 database on each request. Changing a price does not need a deploy.
@@ -121,12 +225,38 @@ Endpoints, all under the admin token:
 | `POST /api/admin/rate-card` | publish a new version |
 | `PATCH /api/admin/rate-card/online-pricing` | the switch |
 
-Adding a **service code** means touching four places, because nothing generates the
-frontend from the backend: `app/models/enums.py` (`ServiceCode`), the seeded grid's
-`minutes_per_100sqft`, `SERVICE_LABELS` in `frontend/js/rates.js`, and the
-checkboxes in `frontend/soumission.html`. The test
-`test_every_service_the_form_offers_is_a_real_code` catches the last two drifting
-apart; the first two are on you.
+**Adding an extra takes no code at all.** An extra lives entirely on the card:
+its price, its wording in both languages, and the **unit** the price is per.
+
+| unit | quantity comes from | example |
+|---|---|---|
+| `flat` | always 1 | `Intérieur du four — 30 $` |
+| `each` | the visitor, via a stepper | `Vitres intérieures — 4 $ par fenêtre` |
+| `per_100sqft` | the area, rounded up | `Plinthes — 14 $ par 100 pi²` |
+
+Anything not `flat` must say what it counts (`per_fr` / `per_en`), because the
+breakdown reads `Vitres intérieures × 6 par fenêtre` and without the last two
+words the client has to guess. A `flat` extra must carry no unit label, for the
+same reason in reverse. Both are enforced in `app/schemas/rate_card.py` and again
+in `/admin/tarifs` before the round trip.
+
+The extra's **code** (`windows`) is the stable key: stored requests and the quote
+form agree on it, so it is lower-case ASCII and never changes. The wording is what
+changes. Retiring an extra does not touch requests that already bought it — they
+keep the wording and price from the card that quoted them, read back out of
+`computed_breakdown`.
+
+The form learns all of this from `GET /api/quotes/form-config`, which is derived
+from the active card. That is the rule the whole pricing design rests on:
+
+> **The form asks only what the active rate card can price.**
+
+Adding a **service code**, by contrast, still means touching four places, because
+nothing generates the frontend from the backend: `app/models/enums.py`
+(`ServiceCode`), the seeded grid's `minutes_per_100sqft`, `SERVICE_LABELS` in
+`frontend/js/admin-common.js`, and the checkboxes in `frontend/soumission.html`.
+The test `test_every_service_the_form_offers_is_a_real_code` catches the last two
+drifting apart; the first two are on you. Services should go the way extras did.
 
 ## The quote form
 

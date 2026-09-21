@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -16,6 +16,20 @@ class LoginOut(BaseModel):
     token: str
     username: str
     expires_in: int
+
+
+class RequestedItem(BaseModel):
+    """One thing the visitor asked for, ready to read.
+
+    The label is resolved server-side because that is where the rate card lives:
+    a priced request keeps the wording of the card that priced it, which may not
+    be the wording the active card uses today.
+    """
+
+    code: str
+    label: str
+    quantity: int | None = None
+    unit: str = ""
 
 
 class AdminRequestRow(BaseModel):
@@ -34,9 +48,25 @@ class AdminRequestRow(BaseModel):
     bedrooms: int | None
     bathrooms: int | None
     restrooms: int | None
+    # Not priced by anything, and that is fine: a three-storey office is a
+    # different job, and the person writing the quote needs to know. Collected
+    # and shown beats collected and buried, which is what it was.
+    floors: int | None
+    address_line: str | None
+    postal_code: str | None
     city: str | None
     borough: str | None
     access_notes: str | None
+    desired_start: date | None
+    preferred_contact: str | None
+    night_access: bool
+    # What was actually asked for. Without these the person doing the job reads a
+    # total and has no idea it covers forty windows.
+    services: list[str]
+    extras: list[RequestedItem]
+    # The answers that changed the price: "Premier ménage : Oui". Without them a
+    # 459 $ quote and a 221 $ one look like the same job.
+    modifiers: list[RequestedItem]
     computed_total_cents: int | None
     quoted_total_cents: int | None
     utm_campaign: str | None

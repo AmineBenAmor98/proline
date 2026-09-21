@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.models import RateCard
+from app.services.presets import STANDARD_MODIFIERS
 
 VERSION = "placeholder-2026-09"
 
@@ -41,7 +42,30 @@ GRID = {
         "carpets": 8,
     },
     "minutes_per_restroom": 12,
-    "extras_cents": {"fridge": 2500, "oven": 3000, "windows": 4000},
+    # Every extra says what its price is per. "flat" keeps the old behaviour;
+    # "each" multiplies by what the visitor asks for.
+    "extras": {
+        "fridge": {"unit": "flat", "cents": 2500,
+                   "label_fr": "Intérieur du réfrigérateur", "label_en": "Inside the fridge"},
+        "oven": {"unit": "flat", "cents": 3000,
+                 "label_fr": "Intérieur du four", "label_en": "Inside the oven"},
+        "windows": {"unit": "each", "cents": 400,
+                    "label_fr": "Vitres intérieures", "label_en": "Interior windows",
+                    "per_fr": "par fenêtre", "per_en": "per window"},
+        "carpets": {"unit": "each", "cents": 2500,
+                    "label_fr": "Shampooing de tapis", "label_en": "Carpet shampoo",
+                    "per_fr": "par pièce", "per_en": "per room"},
+        "baseboards": {"unit": "per_100sqft", "cents": 1400,
+                       "label_fr": "Plinthes", "label_en": "Baseboards",
+                       "per_fr": "par 100 pi²", "per_en": "per 100 sq ft"},
+    },
+    # The four standard questions, from app/services/presets.py -- the same set
+    # /admin/tarifs offers to a card that predates them, so there is one
+    # definition rather than two that drift.
+    "residential_modifiers": STANDARD_MODIFIERS,
+    # Modifiers compound. A first clean of a very dirty empty flat is already
+    # 1.4 x 1.45 x 1.15 = 2.33; without a ceiling the product runs away.
+    "max_residential_multiplier": "2.5",
     "frequency_discount_pct": {"biweekly": 10, "weekly": 15, "monthly": 5},
     "night_access_multiplier": "1.15",
 }

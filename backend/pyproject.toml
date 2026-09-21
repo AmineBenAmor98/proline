@@ -1,0 +1,24 @@
+[tool.ruff]
+# The code is written at this width; anything wider is a wrapped line someone lost.
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+    # FastAPI's whole dependency system is `= Depends(...)` in a default argument.
+    "B008",
+    # The product is bilingual. French copy in docstrings and messages uses
+    # typographic characters -- « », ×, non-breaking spaces before « : » -- on
+    # purpose, and they are what ships to the client.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    # `class X(str, Enum)` -> `StrEnum` changes what str() returns, and these enums
+    # are persisted. Not a lint-driven change.
+    "UP042",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Migrations are a record of what was run; they are not refactored after the fact.
+"migrations/versions/*" = ["E501"]

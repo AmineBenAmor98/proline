@@ -16,11 +16,11 @@
   --muted: #6b7686;
   --line: #e4e8ef;
   --line-soft: #f1f4f8;
-  --line-strong: var(--line-strong);
+  --line-strong: #cbd3e0;
   --surface-soft: #fafbfd;
-  --gold-deep: var(--gold-deep);
-  --on-navy: var(--on-navy);
-  --on-navy-soft: var(--on-navy-soft);
+  --gold-deep: #a97f22;
+  --on-navy: #eaf0fa;
+  --on-navy-soft: #c2d2ec;
   --danger: #b42318;
   --ok: #027a48;
 
@@ -77,6 +77,12 @@ p { margin: 0; }
 a { color: var(--navy); text-decoration: none; transition: color var(--t); }
 a:hover { color: var(--navy-deep); }
 :focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+/* Containers we focus in code so a screen reader announces the new panel -- a
+   wizard step, the confirmation, the publish dialog. They carry tabindex="-1",
+   so no keyboard user can ever reach them by tabbing and the ring tells nobody
+   anything; it just drew a gold box around the whole form on first paint. The
+   controls inside keep their own rings. */
+[tabindex="-1"]:focus, [tabindex="-1"]:focus-visible { outline: none; }
 
 img { max-width: 100%; display: block; }
 
@@ -128,7 +134,8 @@ section + section { padding-top: 0; }
 
 .site-header { border-bottom: 1px solid var(--line); background: #fff; }
 .site-header .container {
-  display: flex; align-items: center; gap: 20px; min-height: 76px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; min-height: 76px;
+  padding-block: 12px;
 }
 
 .brand { display: flex; align-items: center; gap: 11px; color: var(--ink); }
@@ -143,7 +150,10 @@ section + section { padding-top: 0; }
   color: var(--gold-ink); font-weight: 600;
 }
 
-.site-nav { display: none; margin-left: auto; align-items: center; gap: 26px; }
+.site-nav {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+  width: 100%; order: 3; padding-top: 12px; border-top: 1px solid var(--line-soft);
+}
 .site-nav .navlink {
   font-size: 0.94rem; color: var(--body); font-weight: 500; padding-block: 6px;
   border-bottom: 2px solid transparent;
@@ -158,7 +168,15 @@ section + section { padding-top: 0; }
 }
 .site-nav .lang:hover { border-color: var(--line-strong); color: var(--navy); }
 
-@media (min-width: 880px) { .site-nav { display: flex; } }
+/* The sticky mobile bar already carries the primary CTA, so drop it here. */
+.site-nav .btn { display: none; }
+@media (min-width: 880px) {
+  .site-nav {
+    width: auto; order: 0; margin-left: auto; gap: 26px;
+    padding-top: 0; border-top: 0;
+  }
+  .site-nav .btn { display: inline-flex; }
+}
 
 /* ---------- buttons ---------- */
 
@@ -314,9 +332,17 @@ a.btn-ghost:hover, button.btn-ghost:hover { border-color: var(--navy); color: va
 .field-group { display: grid; gap: 16px; grid-template-columns: 1fr; }
 @media (min-width: 620px) { .field-group { grid-template-columns: 1fr 1fr; } .field-group.three { grid-template-columns: repeat(3, 1fr); } }
 
+/* `input:not([type])` is load-bearing, not a flourish. A bare `<input>` is a text
+   input to the browser but does NOT match `input[type="text"]`, and every field on
+   /admin/tarifs is written bare -- the eight in the markup and every one rates.js
+   generates. Without this line the whole rate-card screen rendered in the browser's
+   default control style: Arial digits, pure black, square 2px inset borders, in the
+   middle of a page set in Karla with 10px radii. It read as a design problem and was
+   really a selector that never matched. */
+input:not([type]),
 input[type="text"], input[type="email"], input[type="tel"], input[type="number"],
 input[type="date"], input[type="password"], select, textarea {
-  width: 100%; min-height: 46px; padding: 11px 13px; font: inherit; font-size: 0.94rem;
+  width: 100%; min-height: 46px; padding: 11px 13px; font: inherit; font-size: 16px;
   color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm);
   transition: border-color var(--t), box-shadow var(--t);
 }
@@ -341,9 +367,73 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
 }
 .choice:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 2px; }
 
+/* Extras: one row each, because an extra can carry a quantity and a unit price.
+   The list is rendered from the active rate card, so nothing here names one. */
+.extras { display: grid; gap: 10px; }
+.extra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.extra .choice { flex: 1 1 260px; justify-content: space-between; gap: 16px; }
+/* With a quantity column in play, every row shares the same two tracks, so the
+   pills line up whether or not that row has a stepper. */
+/* Only from 620px up: on a phone a pill and a stepper side by side leave the
+   label two words per line and the two controls touching. There, the quantity
+   goes under the extra it belongs to and both run the full width. */
+@media (min-width: 620px) {
+  @supports (grid-template-columns: subgrid) {
+    .extras[data-steppers] { grid-template-columns: minmax(0, 1fr) auto; }
+    .extras[data-steppers] .extra {
+      display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center;
+    }
+    .extras[data-steppers] .extra .choice { flex: none; }
+    .extras[data-steppers] .extra-note { grid-column: 1 / -1; }
+  }
+}
+@media (max-width: 619px) {
+  .extra .choice { flex: 1 1 100%; }
+  .extra .stepper { width: 100%; }
+  .extra .stepper .stepper-input { flex: 1 1 auto; width: auto; }
+}
+.extra-price { color: var(--muted); font-size: 0.88rem; font-weight: 500; white-space: nowrap; }
+.choice:has(input:checked) .extra-price { color: var(--gold-ink); }
+.extra-note { flex: 1 1 100%; margin: 0; padding-left: 18px; font-size: 0.82rem; color: var(--muted); }
+.extra[data-on="no"] .extra-note { display: none; }
+.field[data-empty] { display: none; }
+
+.stepper {
+  display: inline-flex; align-items: stretch; height: 46px; flex: none;
+  border: 1px solid var(--line); border-radius: var(--pill); background: #fff; overflow: hidden;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.stepper:focus-within { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(29, 57, 110, 0.1); }
+.stepper-btn {
+  width: 42px; border: 0; background: transparent; cursor: pointer;
+  color: var(--navy); font-size: 1.06rem; line-height: 1; padding: 0;
+  transition: background var(--t);
+}
+.stepper-btn:hover { background: var(--cream); }
+.stepper .stepper-input {
+  width: 56px; min-height: 0; padding: 0; text-align: center;
+  font-weight: 600; color: var(--navy);
+  border: 0; border-inline: 1px solid var(--line); border-radius: 0;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.stepper .stepper-input::-webkit-outer-spin-button,
+.stepper .stepper-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.stepper .stepper-input:focus { border-color: var(--line); box-shadow: none; }
+
+.line-qty { color: var(--muted); font-weight: 500; }
+
 .checkbox-row { display: flex; align-items: flex-start; gap: 11px; font-size: 0.94rem; margin-bottom: 18px; color: var(--body); }
 .checkbox-row input { width: 19px; height: 19px; margin-top: 2px; accent-color: var(--navy); flex: none; }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+/* A button that reads as a link: used inside an error message, where a full
+   button would shout louder than the sentence it belongs to. */
+.linkbtn {
+  border: 0; background: none; padding: 0; margin-left: 4px;
+  font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 3px;
+  cursor: pointer; font-weight: 600;
+}
+.linkbtn:hover { text-decoration: none; }
 
 .alert { background: #fef3f2; color: var(--danger); border: 1px solid #fecdc9; border-radius: var(--radius-sm); padding: 13px 15px; font-size: 0.88rem; margin-bottom: 16px; }
 
@@ -367,7 +457,6 @@ select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmln
   -webkit-mask: var(--tick) center / contain no-repeat; mask: var(--tick) center / contain no-repeat;
 }
 fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
-.wizard-step[hidden] { display: none; }
 .wizard-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
 
 /* ---------- property type tiles ---------- */
@@ -422,8 +511,7 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 .pricebar-value { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; color: var(--navy); }
 .pricebar-value.is-text { font-family: var(--font-body); font-size: 0.88rem; font-weight: 600; line-height: 1.3; }
 @media (max-width: 879px) {
-  body[data-locale] .callbar { display: none; }
-  .pricebar { display: flex; }
+    .pricebar { display: flex; }
 }
 
 .summary {
@@ -435,6 +523,9 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 .price { font-family: var(--font-display); font-size: 2.4rem; font-weight: 700; color: var(--navy); line-height: 1.1; }
 .summary-line { display: flex; justify-content: space-between; gap: 16px; font-size: 0.88rem; }
 .summary-line span:first-child { color: var(--body); }
+.summary-line.subtotal {
+  margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--line-soft); font-weight: 600;
+}
 .summary hr { border: 0; border-top: 1px solid var(--line); margin: 2px 0; }
 /* Tapping this to call should not need a precise finger. */
 .summary a[href^="tel:"] { display: inline-block; padding-block: 7px; }
@@ -471,7 +562,10 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 
 /* ---------- admin ---------- */
 
-.admin-wrap { padding-block: 40px; }
+/* Wider than the site. --max is a reading measure for prose; the admin is a
+   data screen, and at 1140px the three columns left the price matrix 438px --
+   22px short of its own minimum, so it scrolled sideways inside its card. */
+.admin-wrap { padding-block: 40px; max-width: 1400px; }
 .stat-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
 .stat { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 20px; min-width: 116px; background: #fff; box-shadow: var(--shadow-sm); }
 .stat b { display: block; font-family: var(--font-display); font-size: 1.5rem; color: var(--navy); }
@@ -490,33 +584,191 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 .chip--won { background: #ecfdf3; color: var(--ok); }
 .chip--lost { background: #fef3f2; color: var(--danger); }
 
+/* The status control. It reads as the chip it replaces and it is the chip: the
+   row used to carry a chip AND a select under it, both showing the same value,
+   in the narrowest column on the screen. `width: auto` sizes every one of them
+   to the longest label, so the column stays a straight edge down the table. */
+.statuspick {
+  /* Fixed, not auto: Chrome sizes an appearance:none select from the option text
+     alone and ignores the padding the caret sits in, so the caret landed on top
+     of the last letter. A set width also keeps the column a straight edge. */
+  appearance: none; width: 108px; min-height: 32px;
+  padding: 5px 28px 5px 13px; border-radius: var(--pill);
+  border: 1px solid transparent;
+  font-family: inherit; font-size: 0.75rem; font-weight: 600; line-height: 1.3;
+  cursor: pointer;
+  background-position: right 11px center;
+  transition: border-color var(--t), background-color var(--t);
+}
+.statuspick[data-status="new"] { background-color: #eef4ff; color: var(--navy); border-color: #d7e3fb; }
+.statuspick[data-status="quoted"] { background-color: #fff6e5; color: var(--gold-ink); border-color: var(--cream-line); }
+.statuspick[data-status="won"] { background-color: #ecfdf3; color: var(--ok); border-color: #c3ecd6; }
+.statuspick[data-status="lost"] { background-color: #fef3f2; color: var(--danger); border-color: #fecdc9; }
+.statuspick:hover { border-color: var(--line-strong); }
+.statuspick:focus { box-shadow: 0 0 0 3px rgba(29, 57, 110, 0.12); }
+
+/* No price yet: a queue, not a blank. */
+.todo { color: var(--gold-ink); font-size: 0.82rem; font-weight: 600; }
+
+/* The tallies. `data-status=""` is the Total tile, which stays plain. */
+.stat[data-status="new"] b { color: var(--navy); }
+.stat[data-status="quoted"] b { color: var(--gold-ink); }
+.stat[data-status="won"] b { color: var(--ok); }
+
+/* A row that just saved. Brief, because the point is "that landed", not applause. */
+.admin-table tr.saved > td { background: #f2fbf6; transition: background 0.9s ease; }
+
+/* Extras on a request row. Not `.tag`, which is the public site's eyebrow label. */
+.need-tags { display: inline-flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+/* An answer about the job, not a thing added to it: navy rather than gold, so
+   the two read as different kinds of fact at a glance. */
+.need-tag--mod { background: #eef4ff; border-color: #d7e3fb; color: var(--navy); }
+.need-tag {
+  padding: 2px 9px; border-radius: var(--pill); background: var(--cream);
+  border: 1px solid var(--cream-line); color: var(--gold-ink);
+  font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+}
+
 /* ---------- admin sign-in ---------- */
 
 .admin-body { background: var(--cream); }
 
-/* ---------- rate card screen ---------- */
+/* ---------- the admin type scale ----------
 
-.rate-layout { display: grid; gap: 26px; grid-template-columns: 1fr; align-items: start; }
-@media (min-width: 1080px) {
-  .rate-layout { grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.85fr); gap: 32px; }
+   The site is set at 17px because it is prose: a reading measure, generous
+   leading, headings that carry a page. The admin is a control surface -- nine
+   rows of one number each -- and it was borrowing the prose sizes, which is why
+   it read flat. Measured, everything on /admin/tarifs sat between 9.9px and 17px
+   with a 32px title above it: a section heading the same size as body text, a
+   label two points from its own hint, and the number -- the only thing on the
+   screen that matters -- smaller than the button beside it.
+
+   So: px, not rem. These are control sizes and must not drift with a reading
+   measure. Five steps, each far enough from the next to be read as a different
+   level, and the VALUE outranks its own label, because on this screen the value
+   is the content and the label is the chrome. */
+/* On `.admin-body`, not `.admin-wrap`: the publish dialog is a sibling of <main>
+   rather than a descendant, and it lists money too. Keyed to the wrap it inherited
+   none of this and quietly fell back to the prose sizes. */
+.admin-body {
+  --fs-title: 26px;   /* the page's one h1 */
+  --fs-head: 15px;    /* a card's heading */
+  --fs-value: 15px;   /* what you type -- and what you came to read */
+  --fs-label: 13.5px; /* the name of the thing */
+  --fs-hint: 12px;    /* descriptions and computed consequences */
+  --fs-micro: 11px;   /* rail groups, column heads, badges */
+}
+
+/* A tool screen, not a landing page. This was an inline `font-size:2rem` on the
+   h1 of both admin pages, patching over the site's hero clamp; it belongs here,
+   once, where the rest of the scale lives. */
+.admin-wrap > .section-head { margin-bottom: 20px; }
+.admin-wrap > .section-head h1 {
+  font-size: var(--fs-title); line-height: 1.15; letter-spacing: -0.02em;
+}
+.admin-wrap > .section-head .lead { font-size: 14px; line-height: 1.5; max-width: 62ch; }
+
+/* Digits in a column have to line up, or a 4 next to a 1 looks like a different
+   magnitude. Every field on this screen holds a number. */
+.admin-body input, .admin-body .derived, .admin-body .was, .admin-body .stat b,
+.admin-body .money, .admin-body .admin-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.rate-layout { display: grid; gap: 22px; grid-template-columns: 1fr; align-items: start; }
+/* 1200, not 1080: between the two, three columns left the price matrix below
+   its own minimum width and it scrolled sideways inside its card. Under this the
+   rail lies down and the editor takes the full width. */
+@media (min-width: 1200px) {
+  /* Rail, editor, tester. The rail earns its column because the editor is one
+     section at a time now: the page used to be a single scroll through eight
+     boxes, and every later phase adds another. */
+  .rate-layout { grid-template-columns: 208px minmax(0, 1fr) minmax(300px, 340px); gap: 28px; }
+}
+.rate-col { min-width: 0; }
+
+.rail { display: flex; flex-direction: column; gap: 2px; }
+/* These four words are the map of the whole screen -- they say which part of the
+   pricing you are standing in -- and they were the smallest, faintest type on the
+   page at 0.62rem (9.9px) in muted grey. Uppercase that small with 0.16em tracking
+   is also past the point where the letterforms stay distinguishable. Now they
+   outrank the items they head: 12px, 700, in ink, with the tracking eased off
+   because size and weight already do the work that tracking was compensating for. */
+.rail-group {
+  font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink); font-weight: 700; margin: 22px 0 7px 13px;
+}
+.rail-group:first-child { margin-top: 0; }
+.rail-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; text-align: left; font-family: inherit; font-size: var(--fs-label);
+  padding: 9px 13px; border: 1px solid transparent; border-radius: var(--pill);
+  background: transparent; color: var(--body); cursor: pointer;
+  transition: background var(--t), color var(--t);
+}
+.rail-item:hover { background: #fff; color: var(--ink); }
+.rail-item[aria-current="true"] {
+  background: var(--navy); color: #fff; font-weight: 600;
+}
+/* Replaces `.rail-badge`, which showed a number. See renderRail in rates.js for
+   why the number was wrong; here it is enough to say the dot means "edited, not
+   yet published" and needs no reading. */
+.rail-dot {
+  flex: none; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--gold); box-shadow: 0 0 0 3px rgba(201, 153, 46, 0.18);
+}
+.rail-item[aria-current="true"] .rail-dot {
+  background: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25);
+}
+
+/* Under the three-column breakpoint the rail lies down and scrolls sideways,
+   which keeps every section one tap away without eating a screen of height. */
+@media (max-width: 1199px) {
+  .rail {
+    flex-direction: row; gap: 8px; overflow-x: auto; padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+  .rail-group { display: none; }
+  .rail-item { width: auto; white-space: nowrap; border-color: var(--line); background: #fff; }
 }
 .rate-box {
   background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
   padding: 22px 24px; box-shadow: var(--shadow-sm); margin-bottom: 18px;
 }
-.rate-box > h2 { font-size: 1.06rem; margin-bottom: 4px; }
-.rate-box > .note { margin-bottom: 16px; }
+.rate-box[data-section] { margin-bottom: 0; }
+.rate-box > h2 { font-size: var(--fs-head); line-height: 1.3; margin-bottom: 3px; }
+.rate-box > .note { font-size: var(--fs-hint); margin-bottom: 14px; }
 
-.grid-matrix { width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 460px; }
+/* table-layout: fixed. With auto layout the columns are sized by content, so a
+   bathroom count with no price in any row -- every cell just a "+ ajouter"
+   button -- collapsed to 66px against its neighbours' 156px and the label wrapped
+   onto two lines. Fixed layout gives every bathroom column the same width
+   whether or not anything in it is priced. */
+.grid-matrix {
+  width: 100%; border-collapse: collapse; font-size: 0.88rem; min-width: 460px;
+  table-layout: fixed;
+}
+.grid-matrix th:first-child, .grid-matrix .corner { width: 94px; }
 .grid-matrix th {
-  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
+  font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted);
   font-weight: 600; padding: 0 8px 9px; text-align: center;
 }
-.grid-matrix th:first-child { text-align: left; }
+/* Each axis named once, quietly, instead of "sdb" repeated across the top and
+   "chambres" down the side with an empty corner explaining neither. */
+.grid-matrix .axis { color: var(--gold-ink); }
+.grid-matrix .corner { border: 0; background: transparent; padding: 0; }
+/* The counts are headings for their row, so they sit tight against it. */
+.grid-matrix tbody th {
+  font-size: var(--fs-label); font-weight: 600; color: var(--ink); text-transform: none;
+  letter-spacing: 0; text-align: right; padding: 4px 14px 4px 0; white-space: nowrap;
+}
 .grid-matrix td { padding: 4px; }
 .grid-matrix td:first-child { font-weight: 600; white-space: nowrap; padding-right: 12px; }
 .cell { position: relative; }
-.cell input { width: 100%; min-height: 40px; text-align: right; padding: 6px 26px 6px 10px; font-size: 0.88rem; }
+.cell input {
+  width: 100%; min-height: 38px; text-align: right; padding: 6px 26px 6px 10px;
+  font-size: var(--fs-value); font-weight: 600; color: var(--ink);
+}
 .cell input.bad { border-color: var(--danger); }
 .cell.changed input { border-color: var(--navy); }
 .cell-remove {
@@ -535,16 +787,148 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 }
 .cell.empty button:hover { border-color: var(--navy); color: var(--navy); }
 
+/* Three columns on one line: the name, what the number works out to, the number.
+
+   The computed hint used to sit under the label, which put an effect in the
+   column of causes -- nine gold lines stacked under nine names, each describing a
+   figure three inches to its right. Moving it under its own field was worse: the
+   row grew to 113px to hold a single digit, and the hint ended up nearer the NEXT
+   row's label than its own.
+
+   Beside the field it is unambiguous, adjacent to what it is derived from, and
+   the row collapses to one line. `auto` on the middle column so it takes only the
+   width of its sentence and gives the rest back to the label. */
 .pair-row {
-  display: grid; grid-template-columns: 1fr 132px; gap: 14px; align-items: center;
-  padding: 11px 0; border-bottom: 1px solid var(--line-soft);
+  display: grid; grid-template-columns: 1fr auto 118px; gap: 8px 14px; align-items: center;
+  padding: 9px 0; border-bottom: 1px solid var(--line-soft);
 }
 .pair-row:last-child { border-bottom: 0; }
-.pair-row label { font-size: 0.88rem; font-weight: 500; color: var(--ink); }
-.pair-row .note { font-size: 0.75rem; margin-top: 2px; }
-.pair-row input { min-height: 40px; text-align: right; font-size: 0.88rem; padding: 6px 10px; }
+.pair-row label {
+  display: block; font-size: var(--fs-label); font-weight: 500;
+  line-height: 1.35; color: var(--ink);
+}
+.pair-row .note { font-size: var(--fs-hint); line-height: 1.4; margin-top: 3px; }
+.pair-row input {
+  grid-column: 3; min-height: 38px; text-align: right; padding: 7px 11px;
+  font-size: var(--fs-value); font-weight: 600; color: var(--ink);
+}
 .pair-row input.bad { border-color: var(--danger); }
-.derived { color: var(--gold-ink); font-weight: 600; }
+.pair-row .derived { grid-column: 2; text-align: right; white-space: nowrap; }
+
+/* Narrow: the hint has nowhere to sit beside a field, so it goes back under the
+   label -- where, with only one row's worth of content on screen at a time, the
+   ambiguity that ruled it out on the desktop layout does not arise. */
+@media (max-width: 560px) {
+  .pair-row { grid-template-columns: 1fr 118px; }
+  .pair-row .derived { grid-column: 1; text-align: left; }
+}
+
+/* The admin scale is declared on `.admin-wrap`, and `.derived` only ever appears
+   inside it -- but the fallback keeps this rule honest if it is ever reused. */
+.derived { color: var(--gold-ink); font-weight: 600; font-size: var(--fs-hint, 0.75rem); }
+
+/* One extra: its name, its price, what the price is per, and a worked example.
+   Not a .pair-row, because an extra is four fields rather than one. */
+.extra-edit { padding: 13px 0; border-bottom: 1px solid var(--line-soft); }
+.extra-edit:last-of-type { border-bottom: 0; }
+/* `minmax(0, 320px)` on the name, not `1fr`. With `1fr` the name field took every
+   pixel the other three did not want -- a 540px box holding the word "Plinthes",
+   four times the width of the price beside it and the widest thing in the card,
+   for the least consequential field in the row. It is a short label; give it a
+   short field and let the row end where the controls end. */
+.extra-edit-main {
+  display: grid; grid-template-columns: minmax(0, 320px) 104px 128px 34px;
+  gap: 8px; align-items: center;
+}
+.extra-more { margin-top: 6px; }
+.extra-more > summary {
+  display: inline-block; cursor: pointer; list-style: none;
+  font-size: var(--fs-hint); color: var(--muted); padding: 2px 0;
+}
+.extra-more > summary::-webkit-details-marker { display: none; }
+.extra-more > summary::before { content: "▸ "; }
+.extra-more[open] > summary::before { content: "▾ "; }
+.extra-more > summary:hover { color: var(--navy); }
+.extra-edit-more { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.extra-edit-more input { flex: 1 1 140px; min-width: 0; }
+.extra-edit input, .extra-edit select {
+  min-height: 38px; font-size: var(--fs-label); padding: 6px 10px; color: var(--ink);
+}
+/* 600 and right-aligned is the treatment for a NUMBER. A name is prose: it reads
+   left to right at label weight, so the eye can tell at a glance which fields on
+   this row it is meant to compare. */
+.extra-edit input[data-kind="money"] {
+  text-align: right; font-size: var(--fs-value); font-weight: 600;
+}
+.extra-edit input.bad { border-color: var(--danger); }
+.extra-edit .extra-name-input { font-weight: 500; color: var(--ink); }
+.extra-edit > .note { font-size: var(--fs-hint); margin-top: 6px; }
+.extra-del {
+  min-height: 40px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: #fff; color: var(--muted); cursor: pointer; font-size: 1.06rem; line-height: 1;
+  transition: border-color var(--t), color var(--t);
+}
+.extra-del:hover { border-color: var(--danger); color: var(--danger); }
+/* A modifier: the question, then one row per answer with its two knobs and the
+   worked example. Four columns, because "× 1,4" is not checkable on its own. */
+.mod-edit { padding: 15px 0; border-bottom: 1px solid var(--line-soft); }
+.mod-edit:last-of-type { border-bottom: 0; }
+/* Capped, like the extras name: a question is longer than a label but it is
+   still a sentence, not a paragraph, and a field spanning the whole card reads as
+   the most important thing on it. */
+.mod-head {
+  display: grid; grid-template-columns: minmax(0, 560px) 34px; gap: 8px; align-items: center;
+}
+.mod-name { font-weight: 500; color: var(--ink); font-size: var(--fs-label); }
+.mod-edit input, .mod-edit select {
+  min-height: 38px; font-size: var(--fs-label); padding: 6px 10px; color: var(--ink);
+}
+/* Same rule as the extras: the two knobs are numbers and wear the number
+   treatment; the answer text beside them is prose and does not. */
+.mod-opt input[data-kind] { font-size: var(--fs-value); font-weight: 600; }
+.mod-opts { margin-top: 9px; display: grid; gap: 6px; }
+.mod-opt {
+  display: grid; grid-template-columns: minmax(0, 1.4fr) 96px 104px minmax(0, 1.2fr);
+  gap: 14px; align-items: center;
+}
+.mod-opt input[data-kind] { text-align: right; }
+.mod-opt--head span {
+  font-size: var(--fs-micro); text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--muted); font-weight: 600;
+}
+.mod-opt--head span:nth-child(2), .mod-opt--head span:nth-child(3) { text-align: right; }
+.mod-opt .derived { font-size: var(--fs-hint); }
+.mod-edit .extra-more { margin-top: 10px; }
+@media (max-width: 719px) {
+  .mod-opt { grid-template-columns: 1fr 1fr; }
+  .mod-opt--head { display: none; }
+  .mod-opt .derived { grid-column: 1 / -1; }
+}
+
+/* An empty section has to explain itself: a worked example beats a paragraph
+   about what the feature does. */
+.empty-state { padding: 4px 0 2px; }
+.empty-state > p { font-size: var(--fs-label); line-height: 1.55; color: var(--body); }
+.empty-example {
+  margin-top: 12px; padding: 14px 16px; border-radius: var(--radius-sm);
+  background: var(--cream); border: 1px solid var(--cream-line);
+}
+.empty-example > .note { display: block; margin-bottom: 4px; }
+.empty-example p { font-size: var(--fs-label); color: var(--body); line-height: 1.6; }
+.empty-example em { font-style: normal; font-weight: 600; color: var(--ink); }
+
+.extra-add { padding-top: 13px; }
+.extra-add button {
+  min-height: 40px; padding: 0 16px; border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm); background: transparent; color: var(--muted);
+  font-family: inherit; font-size: var(--fs-label); cursor: pointer;
+  transition: border-color var(--t), color var(--t);
+}
+.extra-add button:hover { border-color: var(--navy); color: var(--navy); }
+@media (max-width: 719px) {
+  .extra-edit-main { grid-template-columns: 1fr 1fr; }
+  .extra-edit-main .extra-name-input { grid-column: 1 / -1; }
+}
 
 .draftbar {
   position: sticky; top: 0; z-index: 20; background: rgba(255, 255, 255, 0.97);
@@ -558,12 +942,18 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
   position: sticky; top: 84px; background: #fff; border: 1px solid var(--navy);
   border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow);
 }
+/* A <button> now, not a <div>: it was unreachable by keyboard, and the selected
+   one was marked by colour alone. */
 .scenario {
+  display: block; width: 100%; text-align: left; font-family: inherit; color: inherit;
   border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px;
-  margin-bottom: 9px; cursor: pointer; transition: border-color var(--t), background var(--t);
+  margin-bottom: 9px; cursor: pointer; background: #fff;
+  transition: border-color var(--t), background var(--t);
 }
 .scenario:hover { border-color: var(--line-strong); }
-.scenario.on { border-color: var(--navy); background: var(--cream); }
+.scenario.on { border-color: var(--navy); background: var(--cream); box-shadow: inset 0 0 0 1px var(--navy); }
+/* Not colour alone: the chosen scenario says so. */
+.scenario.on b::after { content: " ✓"; color: var(--gold-ink); }
 .scenario b { display: block; font-size: 0.88rem; }
 .scenario span { font-size: 0.75rem; color: var(--muted); }
 .delta {
@@ -604,7 +994,6 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
   display: flex; align-items: center; justify-content: center; padding: 24px;
   overflow-y: auto;
 }
-.modal[hidden] { display: none; }
 .modal-card {
   background: #fff; border-radius: var(--radius); padding: 28px; max-width: 620px; width: 100%;
   box-shadow: var(--shadow-lg); max-height: 90vh; overflow-y: auto;
@@ -617,12 +1006,20 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 .review-table .to.big { color: var(--gold-ink); }
 
 /* Editing a price matrix on a phone invites the decimal slip this screen exists to
-   prevent. Below the two-column breakpoint it reads; the kill switch still works. */
+   prevent. Below the two-column breakpoint it reads; the kill switch still works.
+
+   It has to cover every control, not just <input>. The extras editor's unit
+   select, its remove buttons and "+ Ajouter un extra" were left live, so a phone
+   could retire an extra or change how it is billed -- writing to the same draft
+   in localStorage -- but could not type a price, publish, or discard it. That
+   left a draft only a desktop could clear. */
 @media (max-width: 879px) {
-  .rate-box input, .grid-matrix input { pointer-events: none; background: var(--surface-soft); }
-  .cell.empty button, .cell-remove { display: none; }
+  .rate-box input, .rate-box select, .grid-matrix input { pointer-events: none; background: var(--surface-soft); }
+  .cell.empty button, .cell-remove, .extra-del, .extra-add { display: none; }
   .draftbar #publish-btn, .draftbar #discard-btn { display: none; }
-  .rate-box.killrow input { pointer-events: auto; }
+  /* The kill switch is a button, not an input, so it was never frozen -- but say
+     so, rather than leaving the exemption as a rule that matches nothing. */
+  .rate-box.killrow { pointer-events: auto; }
 }
 
 .login-screen {

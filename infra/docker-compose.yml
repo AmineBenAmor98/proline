@@ -39,6 +39,10 @@ services:
       # Tests run in the same container: make test
       - ../backend/tests:/app/tests
       - ../backend/pytest.ini:/app/pytest.ini
+      - ../backend/pyproject.toml:/app/pyproject.toml
+      # conftest.py builds the test database by running the migrations.
+      - ../backend/migrations:/app/migrations
+      - ../backend/alembic.ini:/app/alembic.ini
       - ../backend/requirements-dev.txt:/app/requirements-dev.txt
     depends_on:
       db: {condition: service_healthy}
