@@ -67,9 +67,9 @@
      data-section attributes in tarifs.html are the same eight things, and a
      later phase adds a row here plus a box there, nothing else.
 
-     `keys` says which of flatten()'s keys belong to a section, so the badge can
-     say "you have changed two things in here" without a second source of truth
-     about what lives where. */
+     `keys` says which of flatten()'s keys belong to a section, so the rail can
+     mark the sections holding unpublished edits -- and name them on hover --
+     without a second source of truth about what lives where. */
   var SECTIONS = [
     { group: "Général", id: "gen-minimum", label: "Minimum et déplacement",
       keys: ["minimum_visit_cents", "travel_cents"] },
@@ -476,7 +476,9 @@
     return '<div class="extra-edit" data-code="' + A.esc(code) + '">' +
       '<div class="extra-edit-main">' +
         '<input class="extra-name-input" data-extra="' + A.esc(code) + '" data-part="label_fr" ' +
-          'value="' + A.esc(spec.label_fr || code) + '" aria-label="Nom en français">' +
+          'value="' + A.esc(unnamed[code] ? "" : (spec.label_fr || code)) + '" ' +
+          'placeholder="Nom de l\'extra, par exemple : Lavage de murs" ' +
+          'aria-label="Nom en français">' +
         '<input data-key="extra:' + A.esc(code) + '" data-kind="money" inputmode="decimal" ' +
           'value="' + A.esc(A.moneyExact(spec.cents)) + '" aria-label="Prix">' +
         '<select class="extra-unit" data-extra="' + A.esc(code) + '" aria-label="Facturation">' +
@@ -533,8 +535,12 @@
     var options = mod.options || [];
     return '<div class="mod-edit" data-mod="' + A.esc(code) + '">' +
       '<div class="mod-head">' +
+        /* `|| code` only when there IS a label to fall back from. A row being
+           named right now shows its placeholder, not "question_3". */
         '<input class="mod-name" data-mod="' + A.esc(code) + '" data-part="label_fr" ' +
-          'value="' + A.esc(mod.label_fr || code) + '" aria-label="Question en français">' +
+          'value="' + A.esc(unnamed[code] ? "" : (mod.label_fr || code)) + '" ' +
+          'placeholder="Votre question, par exemple : Y a-t-il un sous-sol ?" ' +
+          'aria-label="Question en français">' +
         '<button type="button" class="extra-del" data-modrm="' + A.esc(code) + '" ' +
           'aria-label="' + A.esc("Retirer « " + (mod.label_fr || code) + " »") + '">&times;</button>' +
       "</div>" +
@@ -572,6 +578,29 @@
             '" aria-label="' + A.esc((option.label_fr || "Réponse") + " en anglais") + '">';
         }).join("") +
       "</div></details></div>";
+  }
+
+  /* Codes of rows added this session and not yet named. A row whose question is
+     still blank when the caret leaves it was a misclick, and is removed again --
+     but only if it is one of these, so clearing an existing question in order to
+     retype it never deletes it. */
+  var unnamed = {};
+
+  /* The code is the key in the JSONB map and the value the public form posts
+     back; it is never shown. Derived codes ("premier_menage") read better in the
+     database, but deriving one from a question that has not been typed yet is
+     impossible, and renaming the key afterwards would orphan every quote already
+     priced with it. A stable meaningless code is the honest trade. */
+  function freeModifierCode() {
+    var n = 1;
+    while (draft.grid.residential_modifiers["question_" + n]) n += 1;
+    return "question_" + n;
+  }
+
+  function freeExtraCode() {
+    var n = 1;
+    while ((draft.grid.extras || {})["extra_" + n]) n += 1;
+    return "extra_" + n;
   }
 
   function orderedModifiers() {
@@ -665,7 +694,7 @@
 
   function renderDraftbar() {
     var list = changes();
-    renderRail(countsBySection(list));
+    renderRail(changesBySection(list));
     el.draftbar.hidden = false;
     el.draftBase.textContent = list.length
       ? "basé sur " + active.version + " · active depuis le " + A.day(active.effective_from)
@@ -692,16 +721,30 @@
     return null;
   }
 
-  function countsBySection(list) {
-    var counts = {};
+  /* Labels, not a tally. A mark on a menu item raises the question it cannot
+     answer -- "why is that one marked?" -- and the tally never answered it
+     either: a bigger number is not a better explanation. The names of the things
+     that changed are already in `changes()`, so the rail can simply say them. */
+  function changesBySection(list) {
+    var bySection = {};
     list.forEach(function (change) {
       var id = change.key && sectionOf(change.key);
-      if (id) counts[id] = (counts[id] || 0) + 1;
+      if (!id) return;
+      (bySection[id] = bySection[id] || []).push(change.label);
     });
-    return counts;
+    return bySection;
   }
 
-  function renderRail(counts) {
+  /* At most four names, then "et N autres": a tooltip is a glance, and the
+     publish dialog is where the full list belongs. */
+  function editSummary(labels) {
+    var shown = labels.slice(0, 4).join(", ");
+    return labels.length > 4
+      ? shown + ", et " + (labels.length - 4) + " autre" + (labels.length - 4 > 1 ? "s" : "")
+      : shown;
+  }
+
+  function renderRail(edits) {
     if (!el.rail) return;
     var group = null;
     el.rail.innerHTML = SECTIONS.map(function (section) {
@@ -718,13 +761,15 @@
          right. The rail only has to answer "where are my unpublished edits?",
          and a dot answers exactly that and nothing it cannot back up. The draft
          bar still gives the real number, in words. */
-      var edited = ((counts || {})[section.id] || 0) > 0;
+      var labels = (edits || {})[section.id] || [];
+      var why = labels.length ? "Non publié : " + editSummary(labels) : "";
       return head +
         '<button type="button" class="rail-item" data-section="' + section.id + '"' +
-        (section.id === currentSection ? ' aria-current="true"' : "") + ">" +
+        (section.id === currentSection ? ' aria-current="true"' : "") +
+        (why ? ' title="' + A.esc(why) + '"' : "") + ">" +
         "<span>" + A.esc(section.label) + "</span>" +
-        (edited
-          ? '<span class="rail-dot" role="img" aria-label="modifications non publiées"></span>'
+        (labels.length
+          ? '<span class="rail-dot" role="img" aria-label="' + A.esc(why) + '"></span>'
           : "") +
         "</button>";
     }).join("");
@@ -739,7 +784,7 @@
     document.querySelectorAll(".rate-box[data-section]").forEach(function (box) {
       box.hidden = box.dataset.section !== currentSection;
     });
-    renderRail(countsBySection(changes()));
+    renderRail(changesBySection(changes()));
     try { localStorage.setItem(SECTION_KEY, currentSection); } catch (e) { /* private mode */ }
     if (options && options.focus) {
       var box = document.querySelector('.rate-box[data-section="' + currentSection + '"]');
@@ -1119,13 +1164,6 @@
     if (span) span.textContent = extraExample(draft.grid.extras[code]);
   }
 
-  /* A code is what the form and the stored requests key on, so it is lower-case
-     ASCII and never changes once used. The wording is what changes. */
-  function extraCodeFrom(text) {
-    return String(text).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
-  }
-
   /* Replace one extra's row and put the focus back where it was. */
   function redrawExtra(code, focusSelector) {
     var row = el.extras.querySelector('.extra-edit[data-code="' + CSS.escape(code) + '"]');
@@ -1142,8 +1180,36 @@
     var mod = draft.grid.residential_modifiers[node.dataset.mod];
     if (node.dataset.index === undefined) mod[node.dataset.part] = node.value;
     else mod.options[Number(node.dataset.index)][node.dataset.part] = node.value;
+    /* While the row is still being named, the question fills the three other
+       wordings too -- the short form used on the quote line, and both English
+       fields -- so one typed sentence produces a usable question instead of
+       three more empty boxes. All four stay editable under "Noms anglais". */
+    if (unnamed[node.dataset.mod] && node.dataset.part === "label_fr") {
+      mod.short_fr = node.value;
+      mod.label_en = node.value;
+      mod.short_en = node.value;
+    }
     afterEdit();
   });
+
+  /* Capture, because blur does not bubble. A row added by mistake disappears on
+     its own rather than becoming an empty question that blocks publishing. */
+  el.modifiers.addEventListener("blur", function (event) {
+    var node = event.target;
+    if (!node.classList || !node.classList.contains("mod-name")) return;
+    var code = node.dataset.mod;
+    if (!unnamed[code]) return;
+    if (node.value.trim()) { delete unnamed[code]; return; }
+
+    delete draft.grid.residential_modifiers[code];
+    delete unnamed[code];
+    /* The node is removed rather than the list rebuilt: a rebuild here would
+       destroy whichever input the click that caused this blur was landing on. */
+    var row = node.closest(".mod-edit");
+    if (row) row.remove();
+    if (!orderedModifiers().length) renderModifiers();
+    afterEdit();
+  }, true);
 
   el.modifiers.addEventListener("click", function (event) {
     var remove = event.target.closest("[data-modrm]");
@@ -1190,31 +1256,40 @@
       );
       return;
     }
+    /* No `window.prompt`. Every other word on this screen is typed into the field
+       that will hold it; asking for the question in a grey browser dialog --
+       titled "localhost:8000 says", in the browser's own language, with the page
+       frozen behind it -- was the one place that stopped being the product and
+       started being the browser. It also asked for the question BEFORE showing
+       the row, so you named a thing you could not yet see.
+
+       The row is the form. Add it empty, put the caret in its question field,
+       and let the same inputs that edit every other question edit this one. */
     if (event.target.id === "add-modifier") {
-      var typed = window.prompt("La question, en français :", "");
-      if (!typed) return;
-      var newCode = extraCodeFrom(typed);
-      if (!newCode) return;
-      if (draft.grid.residential_modifiers[newCode]) {
-        window.alert("Une question porte déjà ce nom.");
-        return;
-      }
-      /* Two answers, the first free: the shape every modifier has to have, so a
-         new one is valid the moment it exists and only needs its numbers. */
+      var newCode = freeModifierCode();
       draft.grid.residential_modifiers[newCode] = {
-        label_fr: typed.trim(), label_en: typed.trim(),
-        short_fr: typed.trim(), short_en: typed.trim(),
+        label_fr: "", label_en: "", short_fr: "", short_en: "",
         sort: (orderedModifiers().length + 1) * 10,
+        /* Two answers, the first free: the shape every modifier has to have, so a
+           new one is valid the moment it exists and only needs its wording. */
         options: [
           { value: "no", label_fr: "Non", label_en: "No", multiplier: "1", cents: 0 },
           { value: "yes", label_fr: "Oui", label_en: "Yes", multiplier: "1", cents: 0 }
         ]
       };
+      /* Tracked out here, not as a field on the modifier: everything inside
+         `draft.grid` is posted to the server verbatim on publish, and a flag that
+         means something only to this screen has no business in the payload. */
+      unnamed[newCode] = true;
       renderModifiers();
-      afterEdit();
-      var added = el.modifiers.querySelector(
-        '.mod-edit[data-mod="' + CSS.escape(newCode) + '"] input[data-kind="decimal"]');
-      if (added) added.focus();
+      var field = el.modifiers.querySelector(
+        '.mod-edit[data-mod="' + CSS.escape(newCode) + '"] .mod-name');
+      if (field) {
+        field.scrollIntoView({ behavior: "smooth", block: "center" });
+        field.focus();
+      }
+      /* No afterEdit() yet: an empty question is not a change worth marking the
+         rail for, and it is dropped again if left blank. */
     }
   });
 
@@ -1240,8 +1315,27 @@
     var part = node.dataset.part;
     if (!part) return;
     draft.grid.extras[node.dataset.extra][part] = node.value;
+    if (unnamed[node.dataset.extra] && part === "label_fr") {
+      draft.grid.extras[node.dataset.extra].label_en = node.value;
+    }
     afterEdit();
   });
+
+  /* The mirror of the modifiers' rule: an extra added by mistake and left
+     unnamed removes itself instead of blocking the next publish. */
+  el.extras.addEventListener("blur", function (event) {
+    var node = event.target;
+    if (!node.classList || !node.classList.contains("extra-name-input")) return;
+    var code = node.dataset.extra;
+    if (!unnamed[code]) return;
+    if (node.value.trim()) { delete unnamed[code]; return; }
+
+    delete draft.grid.extras[code];
+    delete unnamed[code];
+    var row = node.closest(".extra-edit");
+    if (row) row.remove();
+    afterEdit();
+  }, true);
 
   el.extras.addEventListener("click", function (event) {
     var remove = event.target.closest(".extra-del");
@@ -1256,23 +1350,21 @@
       afterEdit();
       return;
     }
+    /* Same as a new question: the row is the form. See the `add-modifier`
+       handler for why the browser prompt went. */
     if (event.target.id === "add-extra") {
-      var typed = window.prompt("Nom de l'extra, en français :", "");
-      if (!typed) return;
-      var newCode = extraCodeFrom(typed);
-      if (!newCode) return;
-      if (draft.grid.extras[newCode]) {
-        window.alert("Un extra porte déjà ce nom.");
-        return;
-      }
+      var newCode = freeExtraCode();
       draft.grid.extras[newCode] = {
-        unit: "flat", cents: 0, label_fr: typed.trim(), label_en: typed.trim(),
-        per_fr: "", per_en: ""
+        unit: "flat", cents: 0, label_fr: "", label_en: "", per_fr: "", per_en: ""
       };
+      unnamed[newCode] = true;
       renderRows();
-      afterEdit();
-      var added = el.extras.querySelector('.extra-edit[data-code="' + CSS.escape(newCode) + '"] input[data-kind="money"]');
-      if (added) added.focus();
+      var field = el.extras.querySelector(
+        '.extra-edit[data-code="' + CSS.escape(newCode) + '"] .extra-name-input');
+      if (field) {
+        field.scrollIntoView({ behavior: "smooth", block: "center" });
+        field.focus();
+      }
     }
   });
 
