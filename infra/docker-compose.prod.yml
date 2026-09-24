@@ -1,0 +1,109 @@
+# Production: one Lightsail instance in ca-central-1 (Montreal), $12/month, plus
+# a $1 bucket for the backups. Everything runs here.
+#
+#   docker compose -f infra/docker-compose.prod.yml up -d
+#
+# WHY ONE BOX. Every managed platform we priced charges $15-20 for a database
+# and another $18 for TLS termination and routing. Both of those are containers
+# on a machine you already rent. At this scale -- a form and a lead table -- the
+# managed versions are buying convenience, not resilience: the $15 database
+# tiers are single instances too, so a host failure means restoring from backup
+# either way. What you are actually buying here, for $13, is the same recovery
+# story, on the condition that the backup below really runs.
+#
+# WHICH IS THE WHOLE POINT OF THE `backup` SERVICE. A dump written nightly to a
+# bucket is not a backup if nobody would notice it stopping. It writes a
+# heartbeat the app reads, and /admin shows the age of the last successful
+# backup on every visit, so a dead cron announces itself on the screen you check
+# for leads rather than on the day you need a restore.
+name: proline
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: proline
+      POSTGRES_DB: proline
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Never published to the host. The database is reachable only on the compose
+    # network: an open 5432 on a public IP is found by scanners within hours.
+    expose: ["5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U proline -d proline"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  app:
+    # Built on the box, not pulled. A registry would mean a CI workflow, a
+    # publish token and a pull credential on the instance -- three things to keep
+    # working in exchange for saving a 90-second build on a machine that deploys
+    # by `git pull`. Worth adding the day there is a staging environment to keep
+    # identical, or a rollback that has to reach a specific published tag.
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: proline-app:latest
+    restart: unless-stopped
+    env_file: /srv/proline/.env
+    environment:
+      ENVIRONMENT: production
+      FRONTEND_DIR: /app/frontend
+    volumes:
+      # Read-only: the app reports the heartbeat's age, it does not write it.
+      - backup_state:/var/lib/proline/backup:ro
+    expose: ["8000"]
+    depends_on:
+      db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - /srv/proline/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # the certificates; losing this re-issues them
+      - caddy_config:/config
+    depends_on:
+      app: {condition: service_started}
+
+  backup:
+    build: ./backup
+    restart: unless-stopped
+    # Its own file, not the app's. These are write credentials for the bucket
+    # holding every backup; the web process has no reason to carry them, and a
+    # shared .env would put them in the environment of the one container that is
+    # reachable from the internet.
+    env_file: /srv/proline/.env.backup   # BACKUP_BUCKET, AWS_*
+    environment:
+      PGHOST: db
+      PGUSER: proline
+      PGDATABASE: proline
+      PGPASSFILE_SRC: /run/secrets/db_password
+      KEEP_DAYS: "30"
+    secrets: [db_password]
+    volumes:
+      - backup_state:/var/lib/proline/backup
+    depends_on:
+      db: {condition: service_healthy}
+
+secrets:
+  db_password:
+    file: /srv/proline/db_password
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+  backup_state:

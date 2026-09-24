@@ -3,7 +3,13 @@ __pycache__/
 .venv/
 venv/
 .env
-.env.local
+.env.*
+!.env.example
+
+# Pulumi: the venv and any local state. Pulumi.<stack>.yaml IS committed --
+# its secrets are encrypted, and the stack config is part of the deployment.
+infra/pulumi/venv/
+.pulumi/
 *.log
 
 .pytest_cache/
@@ -18,3 +24,10 @@ node_modules/
 # scratch archives used to move code into the test sandbox
 *.tgz
 Claude*
+
+# Credential files downloaded from the AWS console. These are the exact names
+# AWS gives them, and the reason this block exists is that one of them was
+# committed once.
+admin_credentials.csv
+*credentials*.csv
+*_accessKeys.csv

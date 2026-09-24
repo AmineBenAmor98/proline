@@ -1,0 +1,29 @@
+# Lives at /srv/proline/Caddyfile on the Lightsail instance.
+#
+# Caddy terminates TLS and proxies to the app. It obtains and renews the
+# certificate itself, which is the whole reason it is here rather than a plain
+# nginx: an expired certificate on a quote form is a silent outage, and the
+# renewal is the step that gets forgotten on a site nobody logs into for months.
+
+prolinecleaningsolutions.ca, www.prolinecleaningsolutions.ca {
+	encode gzip zstd
+
+	# The app serves its own static files, so there is nothing to split out.
+	reverse_proxy app:8000 {
+		# Without this the app sees Caddy's container IP as the client, and
+		# every request in the logs comes from the same address.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+
+	# The admin is a login screen on the open internet; keep it out of indexes
+	# and out of any crawler's idea of the site.
+	header /admin* X-Robots-Tag "noindex, nofollow"
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

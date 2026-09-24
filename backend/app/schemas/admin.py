@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.enums import Audience, Frequency, RequestStatus
 
@@ -83,3 +84,34 @@ class AdminRequestPatch(BaseModel):
     status: RequestStatus | None = None
     quoted_total_cents: int | None = None
     notes: str | None = None
+
+
+class OfferIn(BaseModel):
+    """What Amine types before sending an offer.
+
+    The price is sent explicitly rather than read from the quote row: the number
+    on screen is the one he decided to honour, and reading it back from the
+    database would let a stale tab send a different figure than the one he was
+    looking at.
+    """
+
+    # 4000 characters is a long email and a short essay; the cap is here so a
+    # paste accident cannot become a 2 MB row.
+    message: str = Field(min_length=1, max_length=4000)
+    total_cents: int = Field(ge=0, le=10_000_000)
+
+
+class OfferPreview(BaseModel):
+    subject: str
+    text: str
+    to_email: str
+
+
+class OfferSent(BaseModel):
+    id: UUID
+    to_email: str
+    subject: str
+    total_cents: int
+    status: str
+    sent_at: datetime | None
+    error: str | None

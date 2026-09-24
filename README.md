@@ -6,7 +6,7 @@ One FastAPI process serves the API **and** the site — the same shape as kfz.
 ```
 backend/     FastAPI: API, pricing engine, models, migrations
 frontend/    static HTML, CSS and vanilla JS (FR + EN + /admin)
-infra/       docker-compose for local Postgres, fly.toml for Toronto
+infra/       docker-compose for local Postgres; the production stack, Caddyfile and backup for ca-central-1
 Dockerfile   one image: backend + frontend, migrations then uvicorn
 ```
 
@@ -327,14 +327,71 @@ a size or a radius outside them is how this drifts, so don't.
   each one is true before the site goes live.
 - **Review counts and the email address** in the HTML, marked `[LIKE THIS]`.
 - **English pages** are generated: edit the French page, then run `python3 frontend/build_en.py`.
-- **Notifications** are logged, not sent, until `RESEND_API_KEY` and the Twilio keys are set
-  and `ENVIRONMENT` is not `local`.
+- **Notifications** are logged, not sent, until `SMTP_HOST` and `NOTIFY_EMAIL_TO` (or the
+  Twilio keys) are set and `ENVIRONMENT` is not `local`.
 
 ## Deploy
 
+One **Lightsail instance in `ca-central-1` (Montreal)** runs everything — app,
+Postgres and Caddy as containers — with a **Lightsail bucket** holding the nightly
+database dumps. **$13/month**: $12 instance, $1 bucket.
+
 ```bash
-fly deploy --config infra/fly.toml     # Toronto (yyz), the only Canadian region on Fly
+scp infra/Caddyfile      root@<instance>:/srv/proline/Caddyfile
+scp infra/docker-compose.prod.yml root@<instance>:/srv/proline/
+docker compose -f infra/docker-compose.prod.yml up -d --build
 ```
 
-Database and photo storage live in Supabase `ca-central-1` (Montreal), so client data stays
-in Canada end to end.
+**Why one box rather than a managed database.** Every platform priced for this
+charges $15–20 for Postgres and another $18 for TLS and routing, and at this
+scale both are containers on a machine you already rent — the $15 database tiers
+are single instances too, so a host failure means restoring from backup either
+way. What $13 buys is the same recovery story **on the condition that the backup
+actually runs**, which is what the `backup` service is for.
+
+Montreal is the region because the form collects names, phone numbers, emails and
+addresses of Quebec residents, and Law 25 carries obligations about personal
+information held outside the province. **Confirm that with someone qualified
+before launch** — nothing here is legal advice.
+
+### The backup, and why it is noisy
+
+`infra/backup/` dumps the database nightly at 03:15 UTC, gzips it, uploads it to
+the bucket and keeps 30 days. It refuses to call a dump under 1 KiB a backup, and
+**on any failure it leaves the heartbeat untouched** rather than writing a fresh
+one.
+
+That heartbeat is the point. `/admin` reads it on every load and shows a warning
+once the last success is over 36 hours old — one late night is tolerated, two are
+not. The failure this guards against is not a crash; it is a rotated key or a full
+disk quietly ending the backups months before anyone needs one. Putting the alarm
+on the screen you already open to read leads is the only version of this that
+still works in six months.
+
+**Restore before you need to.** An untested restore is a hope:
+
+```bash
+docker compose -f infra/docker-compose.prod.yml run --rm backup restore.sh
+```
+
+It checks the gzip before touching the database and asks you to type the database
+name. Run it once against a throwaway database and confirm a lead comes back.
+
+### Before the first deploy
+
+In `/srv/proline/.env`:
+
+- `ENVIRONMENT=production` — this makes the app **refuse to start** on a default
+  `ADMIN_PASSWORD` or `SECRET_KEY`. That is deliberate.
+- `ADMIN_PASSWORD`, `SECRET_KEY` — real values. `proline` is in this public repo.
+- `DATABASE_URL=postgresql+asyncpg://proline:<pw>@db:5432/proline`. Any libpq URL
+  works too: `normalise_database_url` in `app/core/config.py` converts the scheme
+  and translates `sslmode`, so a managed provider's string can be pasted as-is if
+  you ever move off the box.
+- `BACKUP_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+  `AWS_DEFAULT_REGION=ca-central-1` — the bucket credentials.
+- `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `MAIL_REPLY_TO` and
+  `NOTIFY_EMAIL_TO` — or the Twilio keys. **Until one pair is set, a lead is
+  written to the database and nobody is told about it.**
+
+And `/srv/proline/db_password`, a single line, mounted as a Docker secret.

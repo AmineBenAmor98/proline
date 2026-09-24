@@ -6,6 +6,8 @@ prefix and the same token.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,7 +22,7 @@ from app.core.security import (
     require_admin,
 )
 from app.db.session import get_session
-from app.models import Lead, Property, Quote, QuoteRequest
+from app.models import Lead, OfferEmail, Property, Quote, QuoteRequest
 from app.models.enums import RequestStatus
 from app.schemas.admin import (
     AdminRequestList,
@@ -28,8 +30,13 @@ from app.schemas.admin import (
     AdminRequestRow,
     LoginIn,
     LoginOut,
+    OfferIn,
+    OfferPreview,
+    OfferSent,
     RequestedItem,
 )
+from app.services import offers
+from app.services.mailer import MailNotConfigured
 from app.services.rate_cards import get_active_rate_card
 
 # Sign-in is public; everything else needs the token it returns.
@@ -52,6 +59,48 @@ async def login(payload: LoginIn, settings: Settings = Depends(get_settings)) ->
 async def me(username: str = Depends(require_admin)) -> dict[str, str]:
     """Lets the panel check a stored token before showing anything."""
     return {"username": username}
+
+
+# Written by the backup container on each successful upload, mounted read-only
+# here. A path rather than a table on purpose: if the database is the thing that
+# is broken, a heartbeat stored inside it cannot tell you so.
+BACKUP_HEARTBEAT = Path("/var/lib/proline/backup/last-success")
+BACKUP_STALE_AFTER = timedelta(hours=36)
+
+
+@router.get("/ops")
+async def ops(username: str = Depends(require_admin)) -> dict[str, object]:
+    """How long ago the database was last backed up.
+
+    This endpoint exists because the deployment runs Postgres on the same box as
+    the app to save $15 a month, which is only a sane trade while the nightly
+    dump is actually running. The failure it guards against is not a crash --
+    it is a rotated key or a full disk quietly ending the backups months before
+    anyone needs one. So the answer is put on the screen Amine already opens to
+    read leads, rather than in a log.
+
+    36 hours, not 24: a nightly job plus a slow upload plus a restart should not
+    cry wolf, but two missed nights should never pass unnoticed.
+    """
+    if not BACKUP_HEARTBEAT.exists():
+        # Also the honest answer in local development and on first boot, where
+        # no backup has run yet -- "unknown" is not "fine".
+        return {"backup": {"state": "unknown", "last_success": None, "age_hours": None}}
+
+    stamp = BACKUP_HEARTBEAT.read_text().strip()
+    try:
+        last = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return {"backup": {"state": "unknown", "last_success": stamp, "age_hours": None}}
+
+    age = datetime.now(UTC) - last
+    return {
+        "backup": {
+            "state": "stale" if age > BACKUP_STALE_AFTER else "ok",
+            "last_success": last.isoformat(),
+            "age_hours": round(age.total_seconds() / 3600, 1),
+        }
+    }
 
 
 def _extras(request: QuoteRequest, card_extras: dict) -> list[RequestedItem]:
@@ -255,3 +304,134 @@ async def update_request(
         request, lead, prop, quote.total_cents if quote else None,
         grid.get("extras", {}), grid.get("residential_modifiers", {}),
     )
+
+
+async def _request_with_people(session: AsyncSession, request_id: UUID):
+    found = (
+        await session.execute(
+            select(QuoteRequest, Lead, Property)
+            .join(Lead, Lead.id == QuoteRequest.lead_id)
+            .join(Property, Property.id == QuoteRequest.property_id)
+            .where(QuoteRequest.id == request_id)
+        )
+    ).first()
+    if found is None:
+        raise HTTPException(status_code=404, detail="request not found")
+    return found
+
+
+@router.post("/requests/{request_id}/offer/preview", response_model=OfferPreview)
+async def preview_offer(
+    request_id: UUID,
+    payload: OfferIn,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+    username: str = Depends(require_admin),
+) -> OfferPreview:
+    """Render without sending.
+
+    Separate from the send on purpose. An offer email is irreversible and goes
+    to a stranger deciding whether to trust this company with their keys, so the
+    exact text is shown first -- rendered by the same function that will send
+    it, not by a lookalike in the browser that can drift from it.
+    """
+    request, lead, prop = await _request_with_people(session, request_id)
+    subject, text = offers.render(
+        settings, lead=lead, prop=prop, request=request,
+        message=payload.message, total_cents=payload.total_cents,
+    )
+    return OfferPreview(subject=subject, text=text, to_email=lead.email)
+
+
+@router.post("/requests/{request_id}/offer", response_model=OfferSent)
+async def send_offer(
+    request_id: UUID,
+    payload: OfferIn,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+    username: str = Depends(require_admin),
+) -> OfferSent:
+    """Send the offer, record it, and move the request out of the inbox."""
+    request, lead, prop = await _request_with_people(session, request_id)
+
+    if not lead.email:
+        raise HTTPException(
+            status_code=422,
+            detail="cette demande n'a pas d'adresse courriel : répondez par téléphone",
+        )
+
+    try:
+        record = await offers.send_offer(
+            settings, session,
+            lead=lead, prop=prop, request=request,
+            message=payload.message, total_cents=payload.total_cents,
+        )
+    except MailNotConfigured:
+        # The failed OfferEmail row is rolled back with the request: nothing was
+        # attempted, so recording an attempt would be a lie.
+        await session.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="L'envoi de courriels n'est pas configuré (SMTP_HOST). "
+                   "Aucun courriel n'a été envoyé.",
+        ) from None
+    except Exception as exc:
+        # The provider refused it. The row IS kept -- that attempt happened and
+        # is worth having -- so this commits before answering.
+        await session.commit()
+        raise HTTPException(
+            status_code=502,
+            detail=f"Le fournisseur a refusé l'envoi : {exc}. Rien n'a été livré.",
+        ) from None
+
+    # The price that was actually promised, on the quote row the rest of the
+    # admin reads.
+    quote = (
+        await session.execute(select(Quote).where(Quote.request_id == request.id))
+    ).scalars().first()
+    if quote is None:
+        quote = Quote(
+            request_id=request.id,
+            rate_card_id=request.rate_card_id,
+            total_cents=payload.total_cents,
+        )
+        session.add(quote)
+    else:
+        quote.total_cents = payload.total_cents
+    quote.sent_at = record.sent_at
+
+    # Same rule as setting a price by hand: only out of `new`, so re-sending to
+    # a client already won does not walk the status backwards.
+    if request.status is RequestStatus.new:
+        request.status = RequestStatus.quoted
+
+    await session.commit()
+    return OfferSent(
+        id=record.id, to_email=record.to_email, subject=record.subject,
+        total_cents=record.total_cents, status=record.status,
+        sent_at=record.sent_at, error=record.error,
+    )
+
+
+@router.get("/requests/{request_id}/offers", response_model=list[OfferSent])
+async def list_offers(
+    request_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    username: str = Depends(require_admin),
+) -> list[OfferSent]:
+    """Everything sent for this request, newest first — including failures."""
+    rows = (
+        await session.execute(
+            select(OfferEmail)
+            .where(OfferEmail.request_id == request_id)
+            .order_by(OfferEmail.created_at.desc())
+        )
+    ).scalars().all()
+    return [
+        OfferSent(
+            id=r.id, to_email=r.to_email, subject=r.subject,
+            total_cents=r.total_cents, status=r.status,
+            sent_at=r.sent_at, error=r.error,
+        )
+        for r in rows
+    ]

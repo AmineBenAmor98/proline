@@ -42,6 +42,11 @@
       <h1>Boîte de réception</h1>
     </div>
 
+    <!-- Only ever visible when the nightly backup has gone quiet. Placed above
+         the leads because that is the one thing on this page more urgent than
+         reading them. -->
+    <div id="backup-warning" class="warnbox amber" hidden role="status"></div>
+
     <div class="stat-row" id="stats"></div>
 
     <div class="choice-row" style="margin-bottom:20px" id="filters">
@@ -60,7 +65,7 @@
         <thead>
           <tr>
             <th>Reçue</th><th>Client</th><th>Propriété</th><th>Besoin</th>
-            <th>Prix calculé</th><th>Prix envoyé</th><th>Statut</th><th>Source</th>
+            <th>Prix calculé</th><th>Prix envoyé</th><th>Statut</th><th>Offre</th><th>Source</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -68,6 +73,46 @@
     </div>
     <p class="note" style="margin-top:14px">Le prix envoyé se sauvegarde quand vous quittez le champ, et fait passer une demande « Nouvelle » à « Envoyée ».</p>
   </main>
+</div>
+
+<!-- The offer composer. A dialog rather than an inline row because sending is
+     irreversible and goes to a stranger: it deserves the whole screen's
+     attention and an explicit second step, not a control you can brush past
+     while scrolling a table. -->
+<div class="modal" id="offer" hidden>
+  <div class="modal-card" id="offer-card" role="dialog" aria-modal="true"
+       aria-labelledby="offer-title" tabindex="-1">
+    <h2 id="offer-title">Envoyer l'offre</h2>
+    <p class="note" id="offer-to"></p>
+
+    <div class="field">
+      <label for="offer-price">Prix à envoyer</label>
+      <input type="text" id="offer-price" inputmode="decimal" placeholder="250,00 $">
+    </div>
+
+    <div class="field">
+      <label for="offer-message">Votre message</label>
+      <textarea id="offer-message" rows="5"></textarea>
+      <p class="note">Le prix, la propriété et vos coordonnées sont ajoutés
+        automatiquement — écrivez seulement ce que vous voulez dire.</p>
+    </div>
+
+    <!-- Rendered by the server, by the same function that will send it. A
+         preview built in the browser would drift from the real thing, and the
+         one moment that must not happen is just before hitting send. -->
+    <div class="field">
+      <span class="field-label">Ce qui sera envoyé</span>
+      <pre id="offer-preview" class="offer-preview">—</pre>
+    </div>
+
+    <div id="offer-error" class="alert" hidden role="alert"></div>
+
+    <div class="row" style="justify-content:flex-end">
+      <button type="button" class="btn btn-ghost" id="offer-cancel">Annuler</button>
+      <button type="button" class="btn btn-primary" id="offer-send" disabled>
+        Envoyer à ce client</button>
+    </div>
+  </div>
 </div>
 
 <script src="/js/admin-common.js"></script>

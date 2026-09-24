@@ -1,0 +1,19 @@
+# Stack configuration. Safe to commit: secrets in a Pulumi stack file are
+# encrypted, and there are none here -- the AWS credentials come from your
+# ~/.aws profile, not from this file.
+#
+# The two `pulumi config set` values this stack requires are deliberately absent
+# so that `pulumi up` fails with the name of what is missing rather than
+# inheriting someone else's answer. See infra/DEPLOY.md:
+#
+#   pulumi config set sshPublicKey "$(cat ~/.ssh/id_ed25519.pub)"
+#   pulumi config set adminSshCidr <your.ip.address>/32
+#
+config:
+  aws:region: ca-central-1
+  proline-infra:domain: prolinecleaningsolutions.ca
+  proline-infra:availabilityZone: ca-central-1a
+  # Confirm against `aws lightsail get-bundles` before the first up -- see the
+  # comment on INSTANCE_BUNDLE in __main__.py.
+  proline-infra:instanceBundle: small_3_0
+  proline-infra:bucketBundle: small_1_0

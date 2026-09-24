@@ -1040,3 +1040,16 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 .login-card > .note { margin-bottom: 20px; }
 .login-card .field { margin-bottom: 16px; }
 .login-card a.note { margin-top: 16px; display: block; color: var(--muted); }
+
+/* The offer preview. Monospace and pre-wrapped because this is the literal text
+   that will arrive in the client's inbox -- proportional type would reflow it
+   into something that reads differently from what gets sent. */
+.offer-preview {
+  margin: 0; padding: 14px 16px; max-height: 300px; overflow-y: auto;
+  background: var(--surface-soft); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); white-space: pre-wrap; word-break: break-word;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: var(--fs-hint, 0.75rem); line-height: 1.55; color: var(--ink);
+}
+.btn-sm { min-height: 34px; padding: 6px 14px; font-size: var(--fs-label, 0.82rem); }
+.offer-btn[disabled] { opacity: 0.45; cursor: not-allowed; }

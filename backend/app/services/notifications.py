@@ -6,27 +6,30 @@ import httpx
 
 from app.core.config import Settings
 from app.core.logging import logger
+from app.services.mailer import build_message, send
 
 
 async def _send_email(
     client: httpx.AsyncClient, settings: Settings, request_id: str, summary: str
-) -> httpx.Response:
-    return await client.post(
-        "https://api.resend.com/emails",
-        headers={"Authorization": f"Bearer {settings.resend_api_key}"},
-        json={
-            "from": settings.notify_email_from,
-            "to": [settings.notify_email_to],
-            "subject": f"Nouvelle demande de soumission — {request_id[:8]}",
-            "text": summary,
-        },
+) -> None:
+    """The lead alert. Plain text on purpose: it is read on a phone, usually
+    while holding something, and the only job is to say a lead arrived and what
+    it was."""
+    await send(
+        settings,
+        build_message(
+            settings,
+            to=settings.notify_email_to,
+            subject=f"Nouvelle demande de soumission — {request_id[:8]}",
+            text=summary,
+        ),
     )
 
 
 async def _send_sms(
     client: httpx.AsyncClient, settings: Settings, request_id: str, summary: str
-) -> httpx.Response:
-    return await client.post(
+) -> None:
+    response = await client.post(
         f"https://api.twilio.com/2010-04-01/Accounts/{settings.twilio_account_sid}/Messages.json",
         auth=(settings.twilio_account_sid, settings.twilio_auth_token),
         data={
@@ -35,6 +38,7 @@ async def _send_sms(
             "Body": f"Proline: nouvelle demande {request_id[:8]}. {summary[:120]}",
         },
     )
+    response.raise_for_status()
 
 
 async def notify_new_request(settings: Settings, *, request_id: str, summary: str) -> None:
@@ -49,18 +53,18 @@ async def notify_new_request(settings: Settings, *, request_id: str, summary: st
         return
 
     channels = []
-    if settings.resend_api_key and settings.notify_email_to:
+    if settings.smtp_host and settings.notify_email_to:
         channels.append(("email", _send_email))
     if settings.twilio_account_sid and settings.notify_sms_to:
         channels.append(("sms", _send_sms))
 
     sent, failed = [], []
     async with httpx.AsyncClient(timeout=10) as client:
-        for name, send in channels:
+        for name, channel_send in channels:
             try:
-                response = await send(client, settings, request_id, summary)
-                # A 401 from Resend is a failure even though the POST succeeded.
-                response.raise_for_status()
+                # Each channel raises on a provider-level refusal, so a 401 or a
+                # rejected recipient is a failure even though the call returned.
+                await channel_send(client, settings, request_id, summary)
             except Exception as exc:  # provider outage, DNS, timeout
                 failed.append(name)
                 logger.error(
