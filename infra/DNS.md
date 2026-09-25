@@ -8,7 +8,9 @@ these**. Nothing in this repo applies them — `infra/pulumi/dns.py` only prints
 what the AWS side needs, and you type it in.
 
 **Two independent mail systems share this domain.** Microsoft 365 handles your
-mailboxes, Amazon SES sends the automated quote emails. They coexist fine, but
+mailboxes, Amazon SES sends the automated quote emails. `infra/IDENTITIES.md`
+explains which login belongs to which system and traces one quote email end to
+end; this file is only the records. They coexist fine, but
 they share two records — SPF and DMARC — and those are the only ones where an
 edit can break the other system. Everything else belongs to exactly one owner.
 

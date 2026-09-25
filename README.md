@@ -8,6 +8,7 @@ backend/     FastAPI: API, pricing engine, models, migrations
 frontend/    static HTML, CSS and vanilla JS (FR + EN + /admin)
 infra/       docker-compose for local Postgres; the production stack, nginx/certbot and Pulumi for ca-central-1
              DEPLOY.md is the launch sequence in order; DNS.md is the zone, record by record
+             IDENTITIES.md is who-is-who: the seven logins, where each secret lives, how mail flows
 Dockerfile   one image: backend + frontend, migrations then uvicorn
 ```
 

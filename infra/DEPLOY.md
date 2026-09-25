@@ -225,7 +225,15 @@ git clone https://github.com/AmineBenAmor98/proline.git src
 
 # The database password. Generated on the box, never typed, never in git,
 # never in Pulumi state.
-openssl rand -base64 32 | tr -d '\n' > /srv/proline/db_password
+#
+# HEX, NOT BASE64. This password gets pasted into DATABASE_URL below, and base64
+# contains `+` and `/` -- about 74% of 32-byte base64 strings contain at least
+# one. A `/` in the password ends the URL's authority section, so
+# `postgresql+asyncpg://proline:ab/cd@db:5432/proline` parses with `proline` as
+# the HOSTNAME. The app then fails to reach a database with an error that names
+# neither the password nor the URL. Hex has 32 bytes of entropy and no character
+# that means anything to a URL parser.
+openssl rand -hex 32 > /srv/proline/db_password
 chmod 600 /srv/proline/db_password
 ```
 
@@ -239,16 +247,29 @@ DATABASE_URL=postgresql+asyncpg://proline:<contents of db_password>@db:5432/prol
 # The app refuses to start in production on any of these defaults, which is the
 # point. Generate, do not invent.
 ADMIN_USERNAME=<not "admin">
-ADMIN_PASSWORD=<openssl rand -base64 24>
+ADMIN_PASSWORD=<openssl rand -hex 18>
 SECRET_KEY=<openssl rand -hex 32>
 
 # Paste the five lines from: pulumi stack output env_smtp --show-secrets
 SMTP_HOST=...
 
+# All three are the company mailbox, on purpose. See infra/IDENTITIES.md.
 MAIL_FROM=Proline Cleaning Solutions <contact@proline-cleaningsolutions.com>
 MAIL_REPLY_TO=contact@proline-cleaningsolutions.com
-NOTIFY_EMAIL_TO=<your inbox>
+NOTIFY_EMAIL_TO=contact@proline-cleaningsolutions.com
 ```
+
+`NOTIFY_EMAIL_TO` is the company mailbox rather than a personal address, and that
+is not only tidiness. A lead notification is company correspondence: it has to
+survive the person who set the site up losing their phone, changing address, or
+leaving. It also keeps every trace of one enquiry — the notification and the
+client's reply — in a single mailbox, instead of the notification in one inbox and
+the reply in another.
+
+It has a practical benefit too: while SES is in the sandbox it may only deliver to
+addresses you have verified, and the whole domain is already a verified identity —
+so notifications to `contact@` work today, where a Gmail address would need
+verifying separately.
 
 `ENVIRONMENT=production` is set by compose, not here — that is what arms the
 refuse-to-start check above.
