@@ -74,8 +74,29 @@ python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
 pulumi stack select prod --create
 
 pulumi config set sshPublicKey "$(cat ~/.ssh/id_ed25519.pub)"
-pulumi config set adminSshCidr "$(curl -s https://checkip.amazonaws.com)/32"
+pulumi config set sshCidr 0.0.0.0/0
 ```
+
+**`sshCidr` is 0.0.0.0/0 on purpose, and it has one prerequisite.** Port 22 open
+to the internet is safe only because sshd accepts keys and not passwords — there
+is nothing to guess. Confirm that on the box rather than assuming it:
+
+```sh
+sudo sshd -T | grep -iE 'passwordauthentication|permitrootlogin'
+# passwordauthentication no
+# permitrootlogin (prohibit-password|no)
+```
+
+If `passwordauthentication` says `yes`, fix that before leaving port 22 open —
+`/etc/ssh/sshd_config.d/` on Ubuntu, then `sudo systemctl reload ssh`.
+
+This started as a `/32` of the operator's own address and was changed
+deliberately. The narrow thing a `/32` buys is cover against an sshd
+vulnerability you have not patched yet: real, but low-probability, and paid for
+with a lockout every time your address changes — one that presents as a dead
+instance, because a dropped packet gets no reply while 80 and 443 answer
+instantly. If you want it back, set `sshCidr` to your own `/32` and remember that
+Pulumi writes it into `Pulumi.prod.yaml`, which is committed to a public repo.
 
 Confirm the one value that cannot be looked up from code — AWS renamed the
 bundle suffix from `_2_0` to `_3_0` when the current pricing landed, and a wrong
@@ -101,8 +122,34 @@ send-only IAM user for SMTP.
 
 `user-data.sh` runs on first boot and installs Docker, 2 GB of swap, capped
 container logging and unattended security upgrades. Give it two or three minutes
-after `pulumi up` returns; `/var/log/cloud-init-output.log` on the box says when
-it finished.
+after `pulumi up` returns.
+
+**Then verify it, before anything else.** This has already failed once, silently:
+the script aborted on its own first line and did nothing, and the only symptom was
+`docker: command not found` half an hour later, with apt reporting no installation
+candidate for anything. Cloud-init reported `status: error` the whole time and
+nobody looked.
+
+```sh
+sudo cloud-init status --long          # must say: status: done
+docker --version && docker compose version
+swapon --show                         # must list /swapfile, 2G
+test -d /srv/proline && echo srv ok
+```
+
+If `cloud-init status` says `error`, read `/var/log/cloud-init-output.log` — the
+script runs under `set -x`, so the last lines name the failing command outright.
+Do not work around it by installing packages by hand: whatever it skipped, it
+skipped in order, so the swap and `/srv/proline` are missing too, and a 2 GB box
+with no swap gets OOM-killed during `up -d --build`. Re-run the whole thing
+instead, from a clone on the box:
+
+```sh
+sudo bash infra/pulumi/user-data.sh    # idempotent: safe to re-run
+```
+
+Use `bash` explicitly. Cloud-init on Lightsail has been observed running user data
+under `/bin/sh` regardless of the shebang, which is what broke it the first time.
 
 **Then, in the console, request SES production access** — SES → Account
 dashboard → Request production access. There is no API for it. Until it is

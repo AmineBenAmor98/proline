@@ -22,16 +22,20 @@ DOMAIN = _config.require("domain")
 AVAILABILITY_ZONE = _config.require("availabilityZone")
 INSTANCE_BUNDLE = _config.require("instanceBundle")
 
-# Deliberately absent from the committed stack file -- per person, per location:
+# Per machine, so set it once on yours:
 #
 #   pulumi config set sshPublicKey "$(cat ~/.ssh/id_ed25519.pub)"
-#   pulumi config set adminSshCidr "$(curl -s https://checkip.amazonaws.com)/32"
 #
-# Your own public key is uploaded rather than letting Lightsail generate the
-# pair, which would leave a private key in this stack's state. And 0.0.0.0/0 is a
-# defensible answer on a dynamic address -- but it should be one you chose.
+# Your own public key is uploaded rather than letting Lightsail generate the pair,
+# which would leave a private key in this stack's state. It is safe in git, in a
+# public repository: a public key's only power is authorising the private half.
 SSH_PUBLIC_KEY = _config.require("sshPublicKey")
-ADMIN_SSH_CIDR = _config.require("adminSshCidr")
+
+# Who may reach port 22. `0.0.0.0/0` in this stack -- see the long note in
+# compute.py for why a /32 was tried and abandoned, and what it assumes about
+# sshd. Required rather than defaulted precisely because it is a security
+# decision: it should be a line someone chose, visible in the stack file.
+SSH_CIDR = _config.require("sshCidr")
 
 # The mailbox clients reply to, and the address SES is allowed to send as. One
 # constant because the IAM policy condition and MAIL_REPLY_TO must agree.

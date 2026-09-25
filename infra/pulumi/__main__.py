@@ -54,7 +54,7 @@ box = compute.provision(
     availability_zone=settings.AVAILABILITY_ZONE,
     bundle_id=settings.INSTANCE_BUNDLE,
     ssh_public_key=settings.SSH_PUBLIC_KEY,
-    admin_ssh_cidr=settings.ADMIN_SSH_CIDR,
+    ssh_cidr=settings.SSH_CIDR,
     tags=settings.TAGS,
 )
 

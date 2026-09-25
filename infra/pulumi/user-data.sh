@@ -9,7 +9,20 @@
 #
 # Output lands in /var/log/cloud-init-output.log. If the deploy fails, read that
 # before anything else.
-set -euxo pipefail
+#
+# `set -eux` WITHOUT pipefail, and that is not an oversight -- it is a fixed bug.
+# The shebang above is not a guarantee: cloud-init on Lightsail ran this under
+# /bin/sh (dash), where `-o pipefail` does not exist. Under `set -e` an unknown
+# option is itself a fatal error, so the script aborted on its own first line and
+# did NOTHING -- no swap, no Docker, no /srv/proline. The only symptom was
+# `docker: command not found` twenty minutes later, with apt reporting no
+# installation candidate for anything because its lists had never been updated.
+#
+# `-eux` is POSIX and behaves identically in dash and bash. pipefail costs us
+# nothing here because there is not a single pipeline in this file. Keep it that
+# way: if you ever add one, check the exit status explicitly rather than
+# reaching for pipefail, and keep every line below POSIX sh.
+set -eux
 
 export DEBIAN_FRONTEND=noninteractive
 

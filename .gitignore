@@ -31,10 +31,3 @@ Claude*
 admin_credentials.csv
 *credentials*.csv
 *_accessKeys.csv
-
-# The live Pulumi stack file. Pulumi rewrites it with per-machine values --
-# `pulumi config set` puts your SSH public key and your home IP (adminSshCidr)
-# in it, and this repo is public. Pulumi.prod.yaml.example is the committed
-# copy: same config and comments, those two values as placeholders, and the
-# encryptionsalt kept so it is backed up somewhere other than this laptop.
-infra/pulumi/Pulumi.prod.yaml

@@ -9,7 +9,7 @@
 # location -- set them once per machine:
 #
 #   pulumi config set sshPublicKey "$(cat ~/.ssh/id_ed25519.pub)"
-#   pulumi config set adminSshCidr "$(curl -s https://checkip.amazonaws.com)/32"
+#   pulumi config set sshCidr 0.0.0.0/0
 #
 config:
   aws:region: ca-central-1
@@ -26,6 +26,6 @@ config:
   # $2 cheaper and has NO public IPv4 address -- a large share of Canadian
   # residential and corporate networks could not reach the site at all.
   proline-infra:instanceBundle: small_3_0
-  proline-infra:sshPublicKey: ssh-ed25519 AAAA...REPLACE_WITH_YOUR_OWN you@example.com
-  proline-infra:adminSshCidr: <your.ip.address>/32
+  proline-infra:sshPublicKey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOqIIheuPZlc8xp8F/Sdpen/MUZlGFMlOu77GcnJOj/v a.benamor1998@gmail.com
+  proline-infra:sshCidr: 0.0.0.0/0
 encryptionsalt: v1:G8wO9AivkmA=:v1:Nj5pbP5KrAtlQOxv:VSUMpPq8EY/u8Q7KkNOIGWed5keRTQ==
