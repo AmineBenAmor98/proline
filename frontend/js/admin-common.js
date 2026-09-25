@@ -205,7 +205,46 @@ window.ProlineAdmin = (function () {
      This used to pass FastAPI's `detail` straight through, so a dead database
      put "Internal Server Error" on a French admin page and the screen it was
      driving came up blank. A person reading that learns nothing; the thing they
-     need to know is that the server is not answering. */
+     need to know is that the server is not answering.
+
+     Then it over-corrected, and that was worse. The status map below ran FIRST
+     and won every time, so a 502 always read "Le serveur ne répond pas" -- even
+     when the server had answered perfectly and said exactly what was wrong. A
+     real case: SES refused an offer email because the recipient was not verified
+     in its sandbox, the API replied 502 with "Le fournisseur a refusé l'envoi :
+     (554, Email address is not verified...)", and the admin was told to check
+     the server was running. It was running. Nothing about the message pointed
+     anywhere near the actual problem.
+
+     So: a deliberate message from our own API wins, and the status map is the
+     fallback for when there is nothing better. The only details worth ignoring
+     are the generic ones a framework or a proxy invents when it knows nothing,
+     which is what GENERIC_DETAILS is for. */
+  var GENERIC_DETAILS = {
+    "internal server error": 1,
+    "bad gateway": 1,
+    "service unavailable": 1,
+    "gateway timeout": 1,
+    "not found": 1,
+    "unprocessable entity": 1
+  };
+
+  /* The useful part of a response body, or null if there is nothing worth
+     showing. Pydantic reports a list of field errors; the first one names the
+     field that is wrong, which is exactly what the person needs. */
+  function usefulDetail(body) {
+    var detail = body && body.detail;
+    if (typeof detail === "string") {
+      var text = detail.trim();
+      if (!text || GENERIC_DETAILS[text.toLowerCase()]) return null;
+      return text;
+    }
+    if (Array.isArray(detail) && detail.length) {
+      return String(detail[0].msg || "").replace(/^Value error,\s*/, "") || null;
+    }
+    return null;
+  }
+
   var STATUS_MESSAGES = {
     0: "Le serveur ne répond pas. Vérifiez qu'il est démarré, puis rafraîchissez.",
     500: "Le serveur a répondu par une erreur. La base de données est-elle démarrée ?",
@@ -227,15 +266,14 @@ window.ProlineAdmin = (function () {
       return "Erreur dans la page, pas sur le serveur. Rafraîchissez ; " +
         "si cela recommence, la console du navigateur en a le détail.";
     }
+    /* Before the status map, not after. The server knows WHY; a status code only
+       knows the category. A status 0 never reaches here with a body -- there was
+       no answer to have one -- so it still falls through to the map below. */
+    var detail = usefulDetail(error.body);
+    if (detail) return detail;
+
     if (STATUS_MESSAGES[error.status]) return STATUS_MESSAGES[error.status];
 
-    /* Pydantic reports a list of errors; show the first one in words. These are
-       worth passing through -- they say which field is wrong. */
-    var detail = error.body && error.body.detail;
-    if (typeof detail === "string") return detail;
-    if (Array.isArray(detail) && detail.length) {
-      return String(detail[0].msg || "").replace(/^Value error,\s*/, "");
-    }
     /* Never "Erreur " with nothing after it: without a status there is no status
        to show, and the number alone was never the useful part anyway. */
     return error.status

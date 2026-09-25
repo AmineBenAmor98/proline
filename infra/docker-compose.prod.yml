@@ -89,7 +89,15 @@ services:
     healthcheck:
       # Answered by the catch-all server block, so this reports on nginx itself
       # rather than on DNS, TLS and the app all being right.
-      test: ["CMD-SHELL", "wget -qO- http://localhost/nginx-healthz >/dev/null || exit 1"]
+      #
+      # 127.0.0.1, NOT `localhost`. This config listens on IPv4 only, on purpose
+      # -- the instance is IPv4 only (compute.py) and `listen [::]:80` fails to
+      # bind where there is no IPv6. But a container's /etc/hosts maps `localhost`
+      # to BOTH 127.0.0.1 and ::1, and busybox wget will happily try ::1 first and
+      # give up there rather than falling back. The result is a permanently
+      # `(unhealthy)` nginx that is in fact serving every request correctly --
+      # a health check that only ever reported on itself.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/nginx-healthz >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       start_period: 10s
