@@ -20,7 +20,7 @@ def provision(
     availability_zone: str,
     bundle_id: str,
     ssh_public_key: str,
-    admin_ssh_cidr: str,
+    ssh_cidr: str,
     tags: dict,
 ) -> Box:
     key_pair = aws.lightsail.KeyPair(
@@ -71,6 +71,23 @@ def provision(
     # OS-only), and rather than reasoning about which ones this image happened to
     # get, these three rules become the entire set. Anything else that was open is
     # closed by the first `pulumi up`.
+    #
+    # It also means a firewall edit made in the Lightsail console is SILENTLY
+    # REVERTED by the next `pulumi up`. Change ssh_cidr here, not there.
+    #
+    # ssh_cidr is 0.0.0.0/0 in this stack, chosen deliberately. It was a /32 of the
+    # operator's own address, and the cure was worse than the disease: the address
+    # changes, the firewall then drops your packets with no reply, and the symptom
+    # -- ssh hanging at "Connecting to" while 80 and 443 answer instantly -- reads
+    # like a dead instance rather than a firewall. It also put a home IP in the
+    # stack file, which Pulumi rewrites automatically, in a public repository.
+    #
+    # WHAT THIS RELIES ON: sshd accepting keys only. There are no passwords to
+    # guess, so an exposed port 22 costs log noise rather than security. Confirm
+    # it, on the box, rather than assuming -- `sudo sshd -T | grep -i
+    # passwordauthentication` must say no. What a /32 bought that this does not is
+    # narrower than it sounds: cover against an sshd vulnerability you have not
+    # patched yet. Real, low-probability, and paid for with recurring lockouts.
     aws.lightsail.InstancePublicPorts(
         "proline-ports",
         instance_name=instance.name,
@@ -82,7 +99,7 @@ def provision(
                 protocol="tcp", from_port=443, to_port=443, cidrs=["0.0.0.0/0"]
             ),
             aws.lightsail.InstancePublicPortsPortInfoArgs(
-                protocol="tcp", from_port=22, to_port=22, cidrs=[admin_ssh_cidr]
+                protocol="tcp", from_port=22, to_port=22, cidrs=[ssh_cidr]
             ),
         ],
     )
