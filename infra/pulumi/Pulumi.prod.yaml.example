@@ -1,0 +1,31 @@
+# Every setting this stack reads lives here. __main__.py has no defaults, so
+# this file is the one place a value can be wrong, and a missing one fails the
+# preview by name rather than silently inheriting something.
+#
+# Safe to commit: secrets in a Pulumi stack file are encrypted, and there are
+# none here. The AWS credentials come from your ~/.aws profile.
+#
+# Two values are deliberately absent because they are per person and per
+# location -- set them once per machine:
+#
+#   pulumi config set sshPublicKey "$(cat ~/.ssh/id_ed25519.pub)"
+#   pulumi config set adminSshCidr "$(curl -s https://checkip.amazonaws.com)/32"
+#
+config:
+  aws:region: ca-central-1
+  proline-infra:domain: proline-cleaningsolutions.com
+  proline-infra:availabilityZone: ca-central-1a
+  # 2 GB / 2 vCPU / 60 GB / 3 TB. Verified against the live API, 2026-09:
+  #
+  #   aws lightsail get-bundles --region ca-central-1 \
+  #     --query 'bundles[?ramSizeInGb==`2.0`].[bundleId,price,ramSizeInGb,cpuCount]' \
+  #     --output table
+  #
+  # Note the `_3_0` suffix: AWS renamed it from `_2_0` with the current pricing,
+  # and much of the documentation still shows the old one. `small_ipv6_3_0` is
+  # $2 cheaper and has NO public IPv4 address -- a large share of Canadian
+  # residential and corporate networks could not reach the site at all.
+  proline-infra:instanceBundle: small_3_0
+  proline-infra:sshPublicKey: ssh-ed25519 AAAA...REPLACE_WITH_YOUR_OWN you@example.com
+  proline-infra:adminSshCidr: <your.ip.address>/32
+encryptionsalt: v1:G8wO9AivkmA=:v1:Nj5pbP5KrAtlQOxv:VSUMpPq8EY/u8Q7KkNOIGWed5keRTQ==

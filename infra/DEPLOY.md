@@ -1,13 +1,20 @@
 # Deploying Proline
 
-One Lightsail instance in Montreal runs everything: the app, Postgres, Caddy and
-the nightly backup, as four containers. A $1 bucket holds the dumps. SES sends
-the mail. Total ≈ $13/month on AWS, plus the domain and mailbox at GoDaddy.
+One Lightsail instance in Montreal runs everything: the app, Postgres, nginx, and
+a certbot whose only job is renewing the certificate — four containers. SES sends
+the mail. Total ≈ $12/month on AWS, plus the domain and mailbox at GoDaddy.
+
+**The recovery point is the instance's daily whole-disk snapshot**, nothing else.
+That means one recovery point per day, and restoring means rebuilding the box from
+a snapshot — the database is a Docker volume on that disk, so the snapshot does
+cover it. There is no nightly dump to a bucket by choice; `git log -- infra/backup`
+has that version if it is ever wanted.
 
 The AWS side is Pulumi (`infra/pulumi/`). What is left by hand is deliberate and
 small: the domain and its DNS, because it lives at GoDaddy; the SES production
-request, because a person reviews it; and the two `.env` files on the box,
-because putting secrets in user data or in stack state is how they leak.
+request, because a person reviews it; and the secrets on the box (`.env` and
+`db_password`), because putting those in user data or in stack state is how they
+leak.
 
 **Read this in order.** Step 2 is the only one with a queue in it — SES
 production access is reviewed by a human and can take a day — so it comes before
@@ -17,8 +24,7 @@ the work that takes twenty minutes.
 
 ## 0. Secure the account
 
-Once there is a running instance and a bucket, the root account is a key to a
-live business.
+Once there is a running instance, the root account is a key to a live business.
 
 - **MFA on the root user.** IAM → Security credentials.
 - **No access keys on root.** If one exists, delete it.
@@ -40,14 +46,23 @@ them and delete `infra/.env`.
 
 ---
 
-## 1. Buy the domain and mailbox at GoDaddy
+## 1. The domain
 
-- `prolinecleaningsolutions.ca`
-- A mailbox at `info@prolinecleaningsolutions.ca` (GoDaddy's cheapest email
-  plan).
+`proline-cleaningsolutions.com` is already registered at GoDaddy — its
+nameservers are `ns31/ns32.domaincontrol.com` and it currently answers on
+GoDaddy's parking addresses. Nothing to buy. Step 3 repoints it — which is one
+edit to the apex `A` record, since `www` is already a `CNAME` pointing at it.
 
-This blocks steps 2 and 4, so it is first. The mailbox is where clients' replies
-land; SES only *sends*.
+**The domain already runs Microsoft 365 email** — its MX points at
+`prolinecleaningsolutions-com01i.mail.protection.outlook.com`. So there is no
+email plan to buy: confirm `contact@proline-cleaningsolutions.com` exists in the
+Microsoft 365 admin centre, and create it there if not. That mailbox is where
+clients' replies land — SES only *sends*, and `MAIL_REPLY_TO` points at it, so
+replies bounce without it.
+
+`infra/DNS.md` documents every record in the zone and which system owns it. Read
+it before changing anything in GoDaddy: two mail systems share this domain, and
+the SPF and DMARC records are shared between them.
 
 ---
 
@@ -81,8 +96,8 @@ pulumi up
 
 That creates the instance (Ubuntu 24.04, 2 GB / 2 vCPU / 60 GB / 3 TB, $12), its
 static IP, a firewall that opens 80 and 443 to the world and 22 only to you,
-daily whole-disk snapshots, the $1 backup bucket with its own scoped access key,
-the SES domain identity with Easy DKIM, and a send-only IAM user for SMTP.
+daily whole-disk snapshots, the SES domain identity with Easy DKIM, and a
+send-only IAM user for SMTP.
 
 `user-data.sh` runs on first boot and installs Docker, 2 GB of swap, capped
 container logging and unattended security upgrades. Give it two or three minutes
@@ -103,37 +118,63 @@ nowhere**. Approval is usually under 24 hours. Start it now, not on launch day.
 pulumi stack output dns_records
 ```
 
-Enter those seven records. **Do this before bringing Caddy up** — Caddy gets its
-certificate through an HTTP challenge, which needs the name to already resolve
-to the box.
+Enter those seven records, leaving GoDaddy's TTL at its default. The columns are
+headed to match its form: TYPE, NAME, VALUE.
 
-Two traps, both in the records Pulumi prints:
+**Read them from that command, not from the summary `pulumi up` prints when it
+finishes.** That summary truncates long strings with `...` and escapes the
+newlines, so what it shows is an incomplete record set that looks complete —
+which for a DKIM CNAME means mail quietly fails authentication.
 
-- **SPF must be a single TXT record naming both senders.** SES sends the offers;
-  GoDaddy sends whatever you type by hand from `info@`. Two SPF records on one
-  name is a permanent failure, not a merge — if GoDaddy already made one, *edit*
-  it. Check GoDaddy's current docs for their exact include; `secureserver.net`
-  is the usual one and is what Pulumi prints, unverified.
-- **DMARC starts at `p=none` on purpose**, so a misconfiguration arrives as a
-  report instead of silently binning your mail. Tighten to `quarantine` after a
-  few clean weeks.
+**Do this before step 5.** The certificate is issued through an HTTP challenge
+against both the apex and `www`, so *both* names must already resolve to the box.
+Step 5 checks, and stops rather than burning a rate limit, but the wait is the
+TTL either way — an hour on most of these records.
+
+In practice only the apex `A` record changes. **Edit GoDaddy's existing `A @`**
+from its parking address to the static IP; do not add a second one beside it.
+**Leave `www` alone** — GoDaddy ships it as a `CNAME` to the apex, which is
+exactly what you want, and a name cannot hold both a CNAME and an A record, so
+there is no `A www` to delete or create.
+
+**SPF and DMARC are the two records that can break your email**, because
+Microsoft 365 shares them with SES. `infra/DNS.md` has the current values and
+what each mechanism is for — read section 5 of it before touching either, and do
+not take the SPF or DMARC wording from `pulumi stack output` at face value: it is
+written for an empty zone, and this zone is not empty.
 
 Confirm before continuing:
 
 ```sh
-dig +short prolinecleaningsolutions.ca      # the static IP
+dig +short proline-cleaningsolutions.com      # the static IP
 ```
 
 ---
 
-## 4. The two secret files
+## 4. The secret file
 
-SSH in with `$(pulumi stack output ssh)`, then:
+SSH in with `$(pulumi stack output ssh)`.
+
+**If that answers `Permission denied (publickey)` on a box you just created, wait
+two minutes and try again before debugging anything.** Lightsail reports the
+instance as running, and sshd answers, before cloud-init has written
+`/home/ubuntu/.ssh/authorized_keys` — so the rejection looks like a wrong key and
+is not one. To tell the two apart in one command, compare the fingerprints:
+
+```sh
+ssh-keygen -lf ~/.ssh/id_ed25519.pub
+pulumi config get sshPublicKey | ssh-keygen -lf -
+```
+
+Equal means the key is right and the answer is patience. Different means
+`pulumi config set sshPublicKey` captured the wrong file — fix it and re-run
+`pulumi up`, which replaces the key pair without rebuilding the instance.
+
+Then, on the box:
 
 ```sh
 cd /srv/proline
 git clone https://github.com/AmineBenAmor98/proline.git src
-cp src/infra/Caddyfile /srv/proline/Caddyfile
 
 # The database password. Generated on the box, never typed, never in git,
 # never in Pulumi state.
@@ -157,69 +198,84 @@ SECRET_KEY=<openssl rand -hex 32>
 # Paste the five lines from: pulumi stack output env_smtp --show-secrets
 SMTP_HOST=...
 
-MAIL_FROM=Proline Cleaning Solutions <info@prolinecleaningsolutions.ca>
-MAIL_REPLY_TO=info@prolinecleaningsolutions.ca
+MAIL_FROM=Proline Cleaning Solutions <contact@proline-cleaningsolutions.com>
+MAIL_REPLY_TO=contact@proline-cleaningsolutions.com
 NOTIFY_EMAIL_TO=<your inbox>
 ```
 
 `ENVIRONMENT=production` is set by compose, not here — that is what arms the
 refuse-to-start check above.
 
-### `/srv/proline/.env.backup`
-
-Separate on purpose: these are write credentials for every backup you have, and
-the web process — the one container reachable from the internet — has no reason
-to carry them.
-
-```sh
-pulumi stack output env_backup --show-secrets
-```
-
-`chmod 600` both files.
+`chmod 600` it.
 
 ---
 
-## 5. Deploy
+## 5. Deploy, and get the first certificate
+
+**The first time, one command does both:**
 
 ```sh
 cd /srv/proline/src
-docker compose -f infra/docker-compose.prod.yml up -d --build
+sudo infra/nginx/init-letsencrypt.sh <an email you actually read>
 ```
 
-The image is built on the box rather than pulled; there is no registry and no
-pull credential. The app container runs `alembic upgrade head` before uvicorn,
-so the schema creates itself. The backup container runs once immediately rather
-than waiting for 03:15, so a broken bucket credential announces itself now.
+That builds the image, starts all four containers, and issues the certificate.
+Use a real address — it is where Let's Encrypt writes if a renewal ever stops
+working, and it is the only warning you get.
+
+Why a script rather than `up -d`: nginx will not start without a certificate file,
+and certbot cannot get a certificate without nginx already answering on port 80.
+The script breaks that loop with a throwaway self-signed certificate, then
+replaces it with the real one. It checks DNS first and does a staging dry run
+before the real request, so a mistake costs a message rather than an hour of
+Let's Encrypt rate limiting. The long comment at the top of the script explains
+each step; **read it before changing any of them, particularly the order.**
+
+Expect a browser certificate warning for the minute between nginx starting and
+the script finishing. That is the throwaway certificate, and it is normal.
+
+The image is built on the box rather than pulled; there is no registry and no pull
+credential. The app container runs `alembic upgrade head` before uvicorn, so the
+schema creates itself.
 
 ```sh
-docker compose -f infra/docker-compose.prod.yml ps
-docker compose -f infra/docker-compose.prod.yml logs backup   # "ok, N bytes -> db/..."
-curl -sS https://prolinecleaningsolutions.ca/healthz
+docker compose -f infra/docker-compose.prod.yml ps        # four services, healthy
+curl -sS https://proline-cleaningsolutions.com/healthz
+curl -sS https://www.proline-cleaningsolutions.com/healthz
+curl -sI http://proline-cleaningsolutions.com/ | head -1   # 301 to https
 ```
 
-If Caddy is looping on certificate errors, DNS is not resolving to this box yet.
-Let it retry — it backs off — rather than restarting it repeatedly, because
-Let's Encrypt rate-limits failed validations per hostname per hour.
+**Renewal is automatic and needs no cron.** The certbot container tries twice a
+day; certbot renews at 30 days remaining, so there are about sixty chances before
+anything expires. nginx reloads itself every six hours to pick up a renewed
+certificate — a reload it needs, because a new file on disk does nothing until
+nginx re-reads it. Prove the whole path works today rather than finding out in
+sixty days:
+
+```sh
+docker compose -f infra/docker-compose.prod.yml \
+  run --rm --entrypoint certbot certbot renew --dry-run
+```
+
+If that fails, the usual cause is port 80: something must serve
+`/.well-known/acme-challenge/` without redirecting it, which is the first
+`location` block in `infra/nginx/conf.d/proline.conf`. Do not "tidy" that block
+away into the HTTPS redirect — renewal is the only thing that uses it, and it
+fails silently two months later.
 
 ---
 
 ## 6. Before you call it launched
 
-- **Sign in to `/admin`** and confirm the backup banner is *absent*. It appears
-  when the last successful backup is more than 36 hours old.
+- **Sign in to `/admin`** and confirm it loads and the request list appears.
 - **Send yourself an offer** from a test lead. While SES is in the sandbox this
   only works to a verified address, which is exactly what you are testing.
-- **Run the restore once, against a throwaway database:**
+- **Confirm a snapshot actually exists**, in the Lightsail console under the
+  instance's Snapshots tab, the day after launch. An automatic snapshot nobody ever
+  verified is the same as no snapshot. Note while you are there that restoring one
+  creates a *new* instance — so recovery also means re-attaching the static IP,
+  which is the step people forget under pressure.
 
-  ```sh
-  docker compose -f infra/docker-compose.prod.yml run --rm \
-    -e PGDATABASE=proline_restore_test backup restore.sh
-  ```
-
-  An untested restore is a hope. The failure modes — a bucket policy that allows
-  writes but not reads, a dump taken with the wrong credentials, a gzip
-  truncated by a full disk — all look exactly like success until the day they
-  don't.
 - **Replace the placeholder prices** with real figures. The site quotes whatever
   is published.
 
@@ -235,9 +291,24 @@ docker compose -f infra/docker-compose.prod.yml up -d --build
 Migrations run on container start. The build takes about ninety seconds and the
 old container keeps serving until the new one is healthy.
 
+**If the pull changed `infra/nginx/conf.d/`, add a reload.** The file is mounted
+from the checkout, so `git pull` updates what is on disk — but compose only
+recreates a service whose *definition* changed, and the nginx service definition
+did not. So nginx keeps running the old configuration until its next six-hourly
+reload, which looks exactly like the change not working:
+
+```sh
+docker compose -f infra/docker-compose.prod.yml exec nginx nginx -t   # check first
+docker compose -f infra/docker-compose.prod.yml exec nginx nginx -s reload
+```
+
+`nginx -t` first, every time. A reload with a broken config is refused and the old
+one keeps serving; a *restart* with a broken config leaves you with no web server.
+
 Infrastructure changes go through `pulumi up` from your laptop. Note that
 changing `blueprint_id`, `bundle_id` or `user_data` **replaces the instance** —
 Lightsail cannot resize in place. Plan that as a rebuild: the database lives in
-a Docker volume on that disk, so restore from the bucket afterwards, and check
+a Docker volume on that disk, so restore from the newest snapshot afterwards, and
+check
 `pulumi preview` for the word `replace` before accepting any infrastructure
 change you did not expect to be destructive.

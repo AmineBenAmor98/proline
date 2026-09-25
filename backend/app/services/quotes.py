@@ -20,7 +20,6 @@ def _pricing_input(payload: QuoteRequestIn | PriceDraftIn) -> PricingInput:
         area_sqft=prop.area_sqft,
         bedrooms=prop.bedrooms,
         bathrooms=prop.bathrooms,
-        floors=prop.floors,
         restrooms=prop.restrooms,
         frequency=payload.frequency.value,
         services=tuple(code.value for code in payload.services),

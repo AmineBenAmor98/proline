@@ -35,7 +35,7 @@ def smtp_configured(monkeypatch):
     settings = get_settings()
     monkeypatch.setattr(settings, "smtp_host", "smtp.test.invalid", raising=False)
     monkeypatch.setattr(
-        settings, "mail_reply_to", "info@prolinecleaningsolutions.ca", raising=False
+        settings, "mail_reply_to", "contact@proline-cleaningsolutions.com", raising=False
     )
     return settings
 

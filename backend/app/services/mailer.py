@@ -37,14 +37,10 @@ class MailNotConfigured(RuntimeError):
 
 
 def build_message(
-    settings: Settings,
-    *,
-    to: str,
-    subject: str,
-    text: str,
-    html: str | None = None,
-    reply_to: str | None = None,
+    settings: Settings, *, to: str, subject: str, text: str
 ) -> EmailMessage:
+    """Plain text, deliberately. An offer is a price and a paragraph; an HTML
+    part would only give it more ways to render badly in someone's inbox."""
     message = EmailMessage()
     message["From"] = settings.mail_from
     message["To"] = to
@@ -52,10 +48,8 @@ def build_message(
     # Reply-To matters more than it looks: mail is SENT through the provider
     # (SES, say) but RECEIVED at the mailbox on the domain, and without this a
     # client's reply goes to whatever bounce address the provider used.
-    message["Reply-To"] = reply_to or settings.mail_reply_to or settings.mail_from
+    message["Reply-To"] = settings.mail_reply_to or settings.mail_from
     message.set_content(text)
-    if html:
-        message.add_alternative(html, subtype="html")
     return message
 
 

@@ -6,7 +6,8 @@ One FastAPI process serves the API **and** the site — the same shape as kfz.
 ```
 backend/     FastAPI: API, pricing engine, models, migrations
 frontend/    static HTML, CSS and vanilla JS (FR + EN + /admin)
-infra/       docker-compose for local Postgres; the production stack, Caddyfile and backup for ca-central-1
+infra/       docker-compose for local Postgres; the production stack, nginx/certbot and Pulumi for ca-central-1
+             DEPLOY.md is the launch sequence in order; DNS.md is the zone, record by record
 Dockerfile   one image: backend + frontend, migrations then uvicorn
 ```
 
@@ -333,12 +334,25 @@ a size or a radius outside them is how this drifts, so don't.
 ## Deploy
 
 One **Lightsail instance in `ca-central-1` (Montreal)** runs everything — app,
-Postgres and Caddy as containers — with a **Lightsail bucket** holding the nightly
-database dumps. **$13/month**: $12 instance, $1 bucket.
+Postgres, nginx and certbot as containers. **$12/month.** The AWS side is Pulumi;
+see `infra/pulumi/` and `infra/DEPLOY.md`. nginx terminates TLS and proxies to the
+app; certbot renews the certificate and nginx reloads on a timer to pick it up, so
+there is no cron and nothing to remember. The first certificate is the one manual
+step — `infra/nginx/init-letsencrypt.sh`, run once, and its header explains why.
+
+There is no registry and no CI: the image is **built on the box** from the root
+`Dockerfile`, which is why the repo is cloned there rather than two files copied
+up. The full sequence — Pulumi, DNS at GoDaddy, the SES production request, the
+secret file — is `infra/DEPLOY.md`, in order. **`infra/DNS.md` documents every
+record in the zone and which system owns it** — read that before editing anything
+at GoDaddy, because two mail systems share this domain (Microsoft 365 for
+mailboxes, Amazon SES for quote emails) and they share the SPF and DMARC records.
+
+Once it is running, a deploy is:
 
 ```bash
-scp infra/Caddyfile      root@<instance>:/srv/proline/Caddyfile
-scp infra/docker-compose.prod.yml root@<instance>:/srv/proline/
+# on the box
+cd /srv/proline/src && git pull
 docker compose -f infra/docker-compose.prod.yml up -d --build
 ```
 
@@ -346,36 +360,30 @@ docker compose -f infra/docker-compose.prod.yml up -d --build
 charges $15–20 for Postgres and another $18 for TLS and routing, and at this
 scale both are containers on a machine you already rent — the $15 database tiers
 are single instances too, so a host failure means restoring from backup either
-way. What $13 buys is the same recovery story **on the condition that the backup
-actually runs**, which is what the `backup` service is for.
+way. What $12 buys is the same recovery story — **provided the recovery point is
+real**, which is the next section.
 
 Montreal is the region because the form collects names, phone numbers, emails and
 addresses of Quebec residents, and Law 25 carries obligations about personal
 information held outside the province. **Confirm that with someone qualified
 before launch** — nothing here is legal advice.
 
-### The backup, and why it is noisy
+### The recovery point
 
-`infra/backup/` dumps the database nightly at 03:15 UTC, gzips it, uploads it to
-the bucket and keeps 30 days. It refuses to call a dump under 1 KiB a backup, and
-**on any failure it leaves the heartbeat untouched** rather than writing a fresh
-one.
+**The instance's daily whole-disk snapshot is the only backup.** One recovery
+point per day, and restoring creates a *new* instance — so recovery also means
+re-attaching the static IP, which is the step that gets forgotten under pressure.
+Verify in the console that snapshots are actually being taken; an automatic
+snapshot nobody checked is the same as no snapshot.
 
-That heartbeat is the point. `/admin` reads it on every load and shows a warning
-once the last success is over 36 hours old — one late night is tolerated, two are
-not. The failure this guards against is not a crash; it is a rotated key or a full
-disk quietly ending the backups months before anyone needs one. Putting the alarm
-on the screen you already open to read leads is the only version of this that
-still works in six months.
+The database is in the `pgdata` Docker volume on that same disk, so the snapshot
+does cover it — there is no second, database-level backup, and nothing in the app
+monitors one.
 
-**Restore before you need to.** An untested restore is a hope:
-
-```bash
-docker compose -f infra/docker-compose.prod.yml run --rm backup restore.sh
-```
-
-It checks the gzip before touching the database and asks you to type the database
-name. Run it once against a throwaway database and confirm a lead comes back.
+There is deliberately **no nightly dump to a bucket**. A `pg_dump` to a Lightsail
+bucket, its container, the Pulumi bucket and the `/admin` staleness banner all
+existed and were removed together; `git log -- infra/backup` is where to find them
+if a sub-daily recovery point ever becomes worth the moving parts.
 
 ### Before the first deploy
 
@@ -388,8 +396,6 @@ In `/srv/proline/.env`:
   works too: `normalise_database_url` in `app/core/config.py` converts the scheme
   and translates `sslmode`, so a managed provider's string can be pasted as-is if
   you ever move off the box.
-- `BACKUP_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
-  `AWS_DEFAULT_REGION=ca-central-1` — the bucket credentials.
 - `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `MAIL_REPLY_TO` and
   `NOTIFY_EMAIL_TO` — or the Twilio keys. **Until one pair is set, a lead is
   written to the database and nobody is told about it.**

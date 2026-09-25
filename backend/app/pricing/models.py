@@ -94,16 +94,6 @@ class ModifierSpec:
                 return candidate
         return None
 
-    @property
-    def prices_anything(self) -> bool:
-        """A question whose every answer is free is not asked.
-
-        Same rule as an extra with no price: the form offers only what the card
-        can price, so a modifier shipped neutral stays invisible until a real
-        number is entered.
-        """
-        return any(not option.is_neutral for option in self.options)
-
 
 @dataclass(frozen=True)
 class LineItem:
@@ -163,7 +153,9 @@ class PricingInput:
     area_sqft: int | None = None
     bedrooms: int | None = None
     bathrooms: int | None = None
-    floors: int | None = None
+    # No `floors`: the form collects it and the admin shows it, because three
+    # storeys is a different job to walk -- but nothing prices it. See the note
+    # on QuoteRequestIn.property. Add it here in the change that prices it.
     restrooms: int | None = None
     frequency: str = "one_time"
     services: tuple[str, ...] = ()

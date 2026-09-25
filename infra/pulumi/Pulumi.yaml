@@ -3,4 +3,4 @@ runtime:
   name: python
   options:
     virtualenv: venv
-description: Lightsail instance, backup bucket and SES identity for Proline, in Montreal.
+description: Lightsail instance and SES sending identity for Proline, in Montreal.

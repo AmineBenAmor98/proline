@@ -75,7 +75,7 @@ class Settings(BaseSettings):
 
     # What the client sees, and where their reply lands. The reply address is a
     # real mailbox on the domain; the sending host above is not.
-    mail_from: str = "Proline Cleaning Solutions <info@prolinecleaningsolutions.ca>"
+    mail_from: str = "Proline Cleaning Solutions <contact@proline-cleaningsolutions.com>"
     mail_reply_to: str = ""
 
     notify_email_to: str = ""
@@ -83,8 +83,6 @@ class Settings(BaseSettings):
     twilio_auth_token: str = ""
     twilio_from: str = ""
     notify_sms_to: str = ""
-
-    sentry_dsn: str = ""
 
     @field_validator("database_url")
     @classmethod
@@ -122,8 +120,8 @@ class Settings(BaseSettings):
 
     @property
     def notifications_enabled(self) -> bool:
-        """SMS alone is a valid setup: gating on Resend made a Twilio-only
-        deployment save every lead and tell nobody."""
+        """SMS alone is a valid setup: gating this on the mailer once made a
+        Twilio-only deployment save every lead and tell nobody."""
         configured = bool(
             (self.smtp_host and self.notify_email_to)
             or (self.twilio_account_sid and self.notify_sms_to)

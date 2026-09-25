@@ -5,7 +5,6 @@
 :root {
   --navy: #1d396e;
   --navy-deep: #13264a;
-  --navy-soft: #2b4a85;
   --gold: #c9992e;
   --gold-ink: #96690f;
   --cream: #faf7ee;
@@ -219,17 +218,13 @@ a.btn-ghost:hover, button.btn-ghost:hover { border-color: var(--navy); color: va
 .pathcard em { font-style: normal; font-size: 0.88rem; font-weight: 600; color: var(--navy); margin-top: 4px; }
 .pathcard--lead { border-color: var(--navy); box-shadow: var(--accent-top), var(--shadow-sm); }
 
-/* Photo slots: a quiet panel, not a pattern. */
+/* Photo slots: a quiet panel, not a pattern. No gold edge, unlike the cards:
+   a straight bar cannot follow the corner radius, and the accent means more
+   when it marks a highlighted card only. */
 .photo {
   position: relative; border-radius: var(--radius-lg); background: var(--cream);
   border: 1px solid var(--cream-line); aspect-ratio: 4 / 3;
   display: grid; place-items: center; overflow: hidden;
-}
-/* Photos carry no gold edge: a straight bar cannot follow the corner radius,
-   and the accent means more when it marks a highlighted card only. */
-.photo span {
-  font-size: 0.75rem; color: var(--muted); letter-spacing: 0.04em;
-  background: #fff; border: 1px solid var(--cream-line); border-radius: var(--pill); padding: 7px 14px;
 }
 .photo--wide { aspect-ratio: 16 / 10; }
 .photo--strip { aspect-ratio: 21 / 9; }
@@ -330,7 +325,7 @@ a.btn-ghost:hover, button.btn-ghost:hover { border-color: var(--navy); color: va
 .field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
 .field > label, .field-label { font-size: 0.82rem; font-weight: 600; color: var(--body); }
 .field-group { display: grid; gap: 16px; grid-template-columns: 1fr; }
-@media (min-width: 620px) { .field-group { grid-template-columns: 1fr 1fr; } .field-group.three { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 620px) { .field-group { grid-template-columns: 1fr 1fr; } }
 
 /* `input:not([type])` is load-bearing, not a flourish. A bare `<input>` is a text
    input to the browser but does NOT match `input[type="text"]`, and every field on

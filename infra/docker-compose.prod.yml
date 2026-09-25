@@ -1,5 +1,5 @@
-# Production: one Lightsail instance in ca-central-1 (Montreal), $12/month, plus
-# a $1 bucket for the backups. Everything runs here.
+# Production: one Lightsail instance in ca-central-1 (Montreal), $12/month.
+# Everything runs here.
 #
 #   docker compose -f infra/docker-compose.prod.yml up -d
 #
@@ -8,14 +8,17 @@
 # on a machine you already rent. At this scale -- a form and a lead table -- the
 # managed versions are buying convenience, not resilience: the $15 database
 # tiers are single instances too, so a host failure means restoring from backup
-# either way. What you are actually buying here, for $13, is the same recovery
-# story, on the condition that the backup below really runs.
+# either way. What you are actually buying here, for $12, is the same recovery
+# story -- provided the recovery point below is real.
 #
-# WHICH IS THE WHOLE POINT OF THE `backup` SERVICE. A dump written nightly to a
-# bucket is not a backup if nobody would notice it stopping. It writes a
-# heartbeat the app reads, and /admin shows the age of the last successful
-# backup on every visit, so a dead cron announces itself on the screen you check
-# for leads rather than on the day you need a restore.
+# Four containers: the app, Postgres, nginx, and a certbot that does nothing but
+# renew. TLS is two containers rather than one because nginx does not manage
+# certificates -- see the nginx service below and infra/nginx/init-letsencrypt.sh.
+#
+# WHERE THE RECOVERY POINT COMES FROM. The instance's daily whole-disk snapshot,
+# and nothing else. That is one recovery point per day, and a restore rebuilds the
+# instance rather than restoring a file -- see infra/DEPLOY.md. The database lives
+# in the pgdata volume on that same disk, so the snapshot does cover it.
 name: proline
 
 services:
@@ -54,9 +57,6 @@ services:
     environment:
       ENVIRONMENT: production
       FRONTEND_DIR: /app/frontend
-    volumes:
-      # Read-only: the app reports the heartbeat's age, it does not write it.
-      - backup_state:/var/lib/proline/backup:ro
     expose: ["8000"]
     depends_on:
       db: {condition: service_healthy}
@@ -67,36 +67,88 @@ services:
       start_period: 40s
       retries: 3
 
-  caddy:
-    image: caddy:2-alpine
+  # TLS and routing. nginx serves, certbot below keeps the certificate alive --
+  # two containers doing what Caddy did in one, which is the trade accepted when
+  # this moved to nginx. The seam between them is the certbot_conf volume.
+  nginx:
+    image: nginx:1.27-alpine
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     volumes:
-      - /srv/proline/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data      # the certificates; losing this re-issues them
-      - caddy_config:/config
+      # From the git checkout, read-only. No copy at /srv/proline to drift: a
+      # `git pull` updates the config and the next reload picks it up.
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # Read-only here on purpose -- only certbot writes certificates.
+      - certbot_conf:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    # Not load-bearing any more: the config names its upstream through a variable
+    # so nginx starts whether or not `app` resolves. Kept because starting in
+    # order avoids a pointless window of 502s on a cold boot.
     depends_on:
       app: {condition: service_started}
+    healthcheck:
+      # Answered by the catch-all server block, so this reports on nginx itself
+      # rather than on DNS, TLS and the app all being right.
+      test: ["CMD-SHELL", "wget -qO- http://localhost/nginx-healthz >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    # THIS RELOAD LOOP IS WHAT REPLACES CADDY'S BIGGEST CONVENIENCE. A renewed
+    # certificate on disk does nothing until nginx re-reads it, and certbot runs
+    # in its own container so it cannot signal this one -- no shared PID
+    # namespace, and mounting the docker socket to get one would hand a web
+    # server root on the host. So nginx reloads itself on a timer. A reload is
+    # graceful, costs nothing, and six hours is comfortably inside certbot's
+    # 30-day renewal margin.
+    #
+    # Without it the failure is the nasty kind: the renewal succeeds, the logs
+    # look clean, and the site goes down 90 days later when the certificate
+    # nginx is still holding in memory finally expires.
+    #
+    # Going through `sh` rather than the image's entrypoint is also deliberate:
+    # that entrypoint's init scripts want to WRITE into /etc/nginx/conf.d, which
+    # is mounted read-only above, and a failing init script aborts the container.
+    # Nothing they do is needed here -- there are no envsubst templates, the
+    # stock nginx.conf already has `worker_processes auto`, and this config sets
+    # its own resolver.
+    command:
+      - /bin/sh
+      - -c
+      - |
+        while :; do sleep 6h & wait $${!}; nginx -s reload; done &
+        exec nginx -g 'daemon off;'
 
-  backup:
-    build: ./backup
+  # Renews the certificate. Issuing the FIRST one needs nginx already running,
+  # which is a loop this cannot break on its own -- infra/nginx/init-letsencrypt.sh
+  # does that once, by hand. After that this container is the whole story.
+  certbot:
+    # Not pinned, because a certbot too old for a future ACME change fails in a
+    # way nobody is watching for, and a tag guessed wrong here fails the deploy
+    # outright. Record what you actually got, and pin it once you have:
+    #   docker compose -f infra/docker-compose.prod.yml run --rm \
+    #     --entrypoint certbot certbot --version
+    image: certbot/certbot:latest
     restart: unless-stopped
-    # Its own file, not the app's. These are write credentials for the bucket
-    # holding every backup; the web process has no reason to carry them, and a
-    # shared .env would put them in the environment of the one container that is
-    # reachable from the internet.
-    env_file: /srv/proline/.env.backup   # BACKUP_BUCKET, AWS_*
-    environment:
-      PGHOST: db
-      PGUSER: proline
-      PGDATABASE: proline
-      PGPASSFILE_SRC: /run/secrets/db_password
-      KEEP_DAYS: "30"
-    secrets: [db_password]
     volumes:
-      - backup_state:/var/lib/proline/backup
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
     depends_on:
-      db: {condition: service_healthy}
+      nginx: {condition: service_started}
+    # `certbot renew` is a no-op until something is due, and a no-op when nothing
+    # is issued yet -- so this is safe to start before the first certificate
+    # exists. Twice a day is what Let's Encrypt asks for: it renews at 30 days
+    # remaining, so there are ~60 chances to succeed before anything breaks.
+    # `wait $${!}` rather than a bare sleep so `docker compose down` is instant.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        trap exit TERM
+        while :; do
+          certbot renew --webroot -w /var/www/certbot --quiet
+          sleep 12h & wait $${!}
+        done
 
 secrets:
   db_password:
@@ -104,6 +156,12 @@ secrets:
 
 volumes:
   pgdata:
-  caddy_data:
-  caddy_config:
-  backup_state:
+  # The certificate and its private key, and the renewal config that remembers
+  # how it was issued. Covered by the daily snapshot. Deleting this volume means
+  # issuing from scratch -- fine, but Let's Encrypt allows 5 identical
+  # certificates per week, so it is not something to do repeatedly while
+  # debugging.
+  certbot_conf:
+  # The ACME challenge webroot: certbot writes a token here, nginx serves it.
+  # Nothing in it needs to survive; it exists only to be shared between the two.
+  certbot_www:

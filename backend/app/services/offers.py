@@ -48,7 +48,6 @@ def render(
     *,
     lead: Lead,
     prop: Property,
-    request: QuoteRequest,
     message: str,
     total_cents: int,
 ) -> tuple[str, str]:
@@ -91,8 +90,7 @@ async def send_offer(
     received it is answered from this table, not from memory.
     """
     subject, text = render(
-        settings, lead=lead, prop=prop, request=request,
-        message=message, total_cents=total_cents,
+        settings, lead=lead, prop=prop, message=message, total_cents=total_cents
     )
 
     record = OfferEmail(

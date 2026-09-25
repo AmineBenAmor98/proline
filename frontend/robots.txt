@@ -9,4 +9,4 @@ Disallow: /en/soumission?
 Disallow: /admin
 Disallow: /admin/
 
-Sitemap: https://prolinesolutions.ca/sitemap.xml
+Sitemap: https://proline-cleaningsolutions.com/sitemap.xml

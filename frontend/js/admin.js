@@ -144,36 +144,6 @@
     }).join("");
   }
 
-  /* The database runs on the same machine as the app, so the nightly dump to
-     the bucket is the only copy. Checked on every load and shown only when it
-     has gone quiet: a warning that is always there stops being read, and this
-     one has to still work months from now, on the day it finally fires.
-
-     Deliberately silent on failure. If /ops itself is unreachable the list
-     below will say so in its own error, and two alarms for one outage teaches
-     you to ignore both. */
-  function checkBackup() {
-    var box = document.getElementById("backup-warning");
-    if (!box) return;
-    A.api("/ops").then(function (data) {
-      var b = (data && data.backup) || {};
-      if (b.state === "stale") {
-        box.innerHTML = "<strong>Sauvegarde en retard.</strong> La dernière " +
-          "sauvegarde réussie de la base remonte à " + A.esc(String(b.age_hours)) +
-          " h. Vérifiez « docker compose logs backup » : les demandes ci-dessous " +
-          "ne sont plus copiées ailleurs.";
-        box.hidden = false;
-      } else if (b.state === "unknown") {
-        box.innerHTML = "<strong>Aucune sauvegarde connue.</strong> Le service de " +
-          "sauvegarde n'a encore rien écrit. Normal en local ; sur le serveur, " +
-          "cela veut dire que rien n'est copié.";
-        box.hidden = false;
-      } else {
-        box.hidden = true;
-      }
-    }, function () { /* see above */ });
-  }
-
 
   /* ---------- the offer composer ----------
 
@@ -289,7 +259,6 @@
 
   function load() {
     panelError.hidden = true;
-    checkBackup();
     var status = currentStatus();
     A.api("/requests" + (status ? "?status=" + status : ""))
       .then(render)

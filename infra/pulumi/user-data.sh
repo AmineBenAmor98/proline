@@ -2,8 +2,8 @@
 # Runs once, as root, on first boot. Everything here is true of any rebuild of
 # this box: the OS packages, swap, Docker, and the directory the deploy expects.
 #
-# WHAT IS NOT HERE: /srv/proline/.env and /srv/proline/.env.backup, and the
-# database password. User data is readable from the instance metadata endpoint by
+# WHAT IS NOT HERE: /srv/proline/.env and the database password. User data is
+# readable from the instance metadata endpoint by
 # anything running on the box, and it is stored in plain text in the Pulumi
 # stack. Secrets go in over SSH, once, by hand -- see infra/DEPLOY.md.
 #
@@ -42,7 +42,8 @@ apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 usermod -aG docker ubuntu
 
 # Docker's default logging grows without bound, and this disk also holds the
-# database. A full disk is the failure that takes both the site and the backup.
+# database. A full disk stops Postgres accepting writes, which is the site down
+# and every lead arriving on it lost -- for log lines nobody asked for.
 cat > /etc/docker/daemon.json <<'EOF'
 {
   "log-driver": "json-file",

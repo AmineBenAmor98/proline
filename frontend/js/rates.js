@@ -112,7 +112,6 @@
     kill: document.getElementById("kill-switch"),
     killNote: document.getElementById("kill-note"),
     review: document.getElementById("review"),
-    reviewIntro: document.getElementById("review-intro"),
     reviewChanges: document.getElementById("review-changes"),
     reviewEffect: document.getElementById("review-effect"),
     reviewError: document.getElementById("review-error")
