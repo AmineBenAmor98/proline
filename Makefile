@@ -1,7 +1,7 @@
 # Proline — everyday commands. `make dev` is the one that matters.
 COMPOSE := docker compose -p proline -f infra/docker-compose.yml
 
-.PHONY: dev up down reset logs rebuild seed shell psql test lint
+.PHONY: dev up down reset logs rebuild seed shell psql test test-form lint
 
 dev: ## Postgres + schema + rate card + site on http://localhost:8000
 	$(COMPOSE) up --build --remove-orphans
@@ -32,6 +32,14 @@ psql:
 
 test: ## Full suite inside the container, against the compose database
 	$(COMPOSE) exec app sh -c "pip install -q -r requirements-dev.txt && pytest -q"
+
+# The quote form in a real DOM. The Python suite is green on bugs this catches:
+# a 422 the form showed as "sending failed, call us", a photo block that never
+# appeared. Runs on the host, needs nothing running.
+test-form: ## The quote form, both languages, in jsdom
+	npm i --no-save --silent jsdom
+	node frontend/test/check_form.js
+	node frontend/test/check_form.js en/soumission.html
 
 
 lint: ## Ruff, configured in backend/pyproject.toml

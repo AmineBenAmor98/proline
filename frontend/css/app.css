@@ -1103,6 +1103,14 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
   height: 40px; padding: 0 8px; border: 1px solid var(--line-strong);
   border-radius: 8px; background: #fff; font-family: var(--font-body); font-size: 0.88rem;
 }
+/* The box that opens when "Autre" is chosen: the customer's own word for a room
+   our list has no name for. Sits directly under the picker, same width. */
+.photo-zone-name {
+  margin-top: 6px; width: 100%; height: 38px; padding: 0 9px;
+  border: 1px solid var(--line-strong); border-radius: 8px; background: #fff;
+  font-family: var(--font-body); font-size: 0.88rem; color: var(--ink);
+}
+.photo-zone-name:focus-visible { outline: 2px solid var(--navy); outline-offset: 1px; }
 .photo-tile[data-state="sent"] .photo-thumb { border-color: var(--ok); }
 .photo-tile[data-state="failed"] .photo-thumb { border-color: var(--danger); }
 
@@ -1207,6 +1215,11 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 .admin-photo-cap { display: flex; align-items: baseline; gap: 8px; }
 .admin-photo-zone { font-size: 0.85rem; font-weight: 600; color: var(--ink); }
 .admin-photo-size { font-size: 0.78rem; color: var(--muted); }
+/* A room name the customer typed rather than one of ours -- shown in quotes so the
+   two are never read as the same kind of thing. */
+.admin-photo-zone.is-custom { font-style: italic; }
+.admin-photo-zone.is-custom::before { content: "\201C"; }
+.admin-photo-zone.is-custom::after { content: "\201D"; }
 
 .lightbox-card { max-width: min(1100px, 94vw); }
 .lightbox-card img {

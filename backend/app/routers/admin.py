@@ -285,7 +285,14 @@ async def request_detail(
             AdminPhoto(
                 id=str(photo.id),
                 zone=photo.zone.value,
-                zone_label_fr=PHOTO_ZONE_LABELS_FR.get(photo.zone, photo.zone.value),
+                # The customer's own word for the room wins over "Autre", which is
+                # the entire reason they were asked for one. Kept as they wrote it,
+                # escaped where it is rendered.
+                zone_label_fr=(
+                    photo.zone_label
+                    or PHOTO_ZONE_LABELS_FR.get(photo.zone, photo.zone.value)
+                ),
+                customer_named=bool(photo.zone_label),
                 bytes_size=photo.bytes_size,
                 created_at=photo.created_at,
             )

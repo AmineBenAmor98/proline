@@ -53,12 +53,23 @@ async def _submit(client) -> tuple[str, str]:
     return body["id"], body["photo_upload_token"]
 
 
-async def _upload(client, request_id, token, *, data=PNG_1PX, zone="kitchen", name="a.png"):
+async def _upload(
+    client, request_id, token, *, data=PNG_1PX, zone="kitchen", name="a.png", zone_label=None
+):
+    form = {"token": token, "zone": zone}
+    if zone_label is not None:
+        form["zone_label"] = zone_label
     return await client.post(
         f"/api/quotes/{request_id}/photos",
-        data={"token": token, "zone": zone},
+        data=form,
         files={"file": (name, data, "image/png")},
     )
+
+
+async def _photos(client, request_id, admin_headers):
+    detail = await client.get(f"/api/admin/requests/{request_id}", headers=admin_headers)
+    assert detail.status_code == 200, detail.text
+    return detail.json()["photos"]
 
 
 # --------------------------------------------------------------------------
@@ -163,6 +174,64 @@ async def test_the_count_limit_holds(client, photos_dir):
     response = await _upload(client, request_id, token)
     assert response.status_code == 409
     assert len([p for p in photos_dir.rglob("*") if p.is_file()]) == 3
+
+
+# --------------------------------------------------------------------------
+# The room the customer names themselves
+# --------------------------------------------------------------------------
+
+async def test_a_customer_named_room_is_kept(client, photos_dir, admin_headers):
+    """"Autre" alone tells the person writing the quote nothing."""
+    request_id, token = await _submit(client)
+    assert (
+        await _upload(client, request_id, token, zone="other", zone_label="Salle de lavage")
+    ).status_code == 201
+
+    photo = (await _photos(client, request_id, admin_headers))[0]
+    assert photo["zone"] == "other"
+    assert photo["zone_label_fr"] == "Salle de lavage"
+    assert photo["customer_named"] is True
+
+
+async def test_other_with_no_name_still_reads_as_autre(client, photos_dir, admin_headers):
+    request_id, token = await _submit(client)
+    assert (await _upload(client, request_id, token, zone="other")).status_code == 201
+    photo = (await _photos(client, request_id, admin_headers))[0]
+    assert photo["zone_label_fr"] == "Autre"
+    assert photo["customer_named"] is False
+
+
+async def test_a_name_on_a_known_room_is_dropped(client, photos_dir, admin_headers):
+    """The enum is what the screen groups by; a second name beside it could only
+    contradict it."""
+    request_id, token = await _submit(client)
+    assert (
+        await _upload(client, request_id, token, zone="kitchen", zone_label="le garage")
+    ).status_code == 201
+    photo = (await _photos(client, request_id, admin_headers))[0]
+    assert photo["zone_label_fr"] == "Cuisine"
+    assert photo["customer_named"] is False
+
+
+@pytest.mark.parametrize(
+    "typed, stored",
+    [
+        ("  salle   de   lavage \n", "salle de lavage"),   # collapsed and trimmed
+        ("ligne1\nligne2", "ligne1 ligne2"),                # no newline in a one-line field
+        ("   ", None),                                      # whitespace is not a name
+        ("\x00\x07", None),                                 # control characters are not either
+        ("x" * 200, "x" * 60),                              # cut to the column's width
+    ],
+)
+async def test_a_typed_name_is_bounded(client, photos_dir, admin_headers, typed, stored):
+    """Anonymous free text that ends up on the operator's screen."""
+    request_id, token = await _submit(client)
+    assert (
+        await _upload(client, request_id, token, zone="other", zone_label=typed)
+    ).status_code == 201, "a bad name must never cost the photo"
+    photo = (await _photos(client, request_id, admin_headers))[0]
+    assert photo["zone_label_fr"] == (stored if stored else "Autre")
+    assert photo["customer_named"] is bool(stored)
 
 
 async def test_unknown_zone_is_refused(client, photos_dir):

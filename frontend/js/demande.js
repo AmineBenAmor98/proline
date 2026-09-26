@@ -123,6 +123,14 @@
       var zone = document.createElement("span");
       zone.className = "admin-photo-zone";
       zone.textContent = photo.zone_label_fr;
+      /* A room the customer named themselves is marked as theirs. Without this,
+         a typed-in "Salle de lavage" reads exactly like one of our categories,
+         and the two are not the same thing: ours are a fixed list you can count
+         across requests, theirs is whatever they wrote. */
+      if (photo.customer_named) {
+        zone.classList.add("is-custom");
+        zone.title = "Nom donné par le client";
+      }
       caption.appendChild(zone);
       if (photo.bytes_size) {
         var size = document.createElement("span");

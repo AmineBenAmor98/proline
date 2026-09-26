@@ -26,6 +26,8 @@
       drop: "ou glissez-les ici",
       max: function (n) { return n + " max"; },
       zone: "Pièce",
+      nameIt: "Quelle pièce ?",
+      nameItHint: "ex. salle de lavage",
       remove: "Retirer cette photo",
       resized: "Redimensionnées dans votre navigateur — l'envoi ne retarde pas votre demande.",
       selected: function (n) { return n + (n > 1 ? " sélectionnées" : " sélectionnée"); },
@@ -43,6 +45,8 @@
       drop: "or drag them here",
       max: function (n) { return n + " max"; },
       zone: "Room",
+      nameIt: "Which room?",
+      nameItHint: "e.g. laundry room",
       remove: "Remove this photo",
       resized: "Resized in your browser — this will not delay your request.",
       selected: function (n) { return n + " selected"; },
@@ -209,18 +213,78 @@
     if (this.zones.length) {
       var id = "zone-" + Math.random().toString(36).slice(2, 9);
       tile.appendChild(el("label", { for: id, class: "photo-zone-label" }, this.t.zone));
-      var select = el("select", { id: id, class: "photo-zone" });
-      this.zones.forEach(function (zone) {
-        var option = el("option", { value: zone.value },
-          self.locale === "en" ? zone.label_en : zone.label_fr);
-        select.appendChild(option);
+      item.select = el("select", { id: id, class: "photo-zone" });
+      tile.appendChild(item.select);
+
+      /* "AUTRE" ON ITS OWN SAYS NOTHING. The list cannot name every room in
+         Montreal -- a laundry room, a solarium, a dépanneur's back store -- and a
+         photo filed under "Autre" leaves whoever writes the quote looking at a
+         picture they have no word for. So picking it opens a box to type the word
+         in. Shown only then: an extra field on every tile for the nine cases the
+         list already covers is nine chances to fill in something redundant. */
+      item.nameBox = el("input", {
+        type: "text", class: "photo-zone-name", maxlength: "60",
+        placeholder: this.t.nameItHint, "aria-label": this.t.nameIt
       });
-      select.addEventListener("change", function () { item.zone = select.value; });
-      tile.appendChild(select);
+      item.nameBox.hidden = true;
+      tile.appendChild(item.nameBox);
+
+      item.select.addEventListener("change", function () {
+        item.zone = item.select.value;
+        self._syncName(item);
+        if (!item.nameBox.hidden) item.nameBox.focus();
+      });
+      item.nameBox.addEventListener("input", function () {
+        item.zoneLabel = item.nameBox.value;
+      });
+      this._fillZones(item);
     }
 
     item.tile = tile;
     this.grid.appendChild(tile);
+  };
+
+  /* Put the current zone list in one tile's select, keeping the chosen room if the
+     new list still has it. */
+  Picker.prototype._fillZones = function (item) {
+    var self = this;
+    var want = item.zone;
+    item.select.innerHTML = "";
+    this.zones.forEach(function (zone) {
+      item.select.appendChild(el("option", { value: zone.value },
+        self.locale === "en" ? zone.label_en : zone.label_fr));
+    });
+    var kept = this.zones.some(function (z) { return z.value === want; });
+    item.select.value = kept ? want : this.zones[0].value;
+    item.zone = item.select.value;
+    this._syncName(item);
+  };
+
+  Picker.prototype._syncName = function (item) {
+    if (!item.nameBox) return;
+    var isOther = item.zone === "other";
+    item.nameBox.hidden = !isOther;
+    /* Cleared on the way out, so a name typed under "Autre" and then changed to
+       "Cuisine" does not travel with it. The server drops it in that case too --
+       this just keeps the screen honest about what will be sent. */
+    if (!isOther) { item.nameBox.value = ""; item.zoneLabel = ""; }
+  };
+
+  /* THE ROOM LIST BELONGS TO THE AUDIENCE, and the audience is chosen after this
+     picker is built -- the form asks for photos on step 1 and the type of place is
+     the first question on it. Mounting once at load meant a shop was offered
+     bedrooms and basements, which is the list for the other kind of customer.
+     So the form calls this whenever the choice changes. Photos already picked are
+     kept; a room that does not exist in the new list falls back to the first one. */
+  Picker.prototype.setZones = function (zones) {
+    if (!zones || !zones.length) return;
+    var same = zones.length === this.zones.length && zones.every(function (z, i) {
+      return z.value === this.zones[i].value;
+    }, this);
+    if (same) return;
+    this.zones = zones;
+    var self = this;
+    this.items.forEach(function (item) { if (item.select) self._fillZones(item); });
   };
 
   Picker.prototype._sync = function () {
@@ -254,6 +318,9 @@
           var body = new FormData();
           body.append("token", token);
           body.append("zone", item.zone);
+          if (item.zone === "other" && item.zoneLabel) {
+            body.append("zone_label", item.zoneLabel.slice(0, 60));
+          }
           body.append("file", blob, (item.file.name || "photo").replace(/[^\w.-]/g, "_"));
           return fetch("/api/quotes/" + encodeURIComponent(requestId) + "/photos", {
             method: "POST", body: body

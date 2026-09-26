@@ -81,7 +81,12 @@ class AdminPhoto(BaseModel):
 
     id: str
     zone: str
+    # The room as it should be shown: our label for it, or the customer's own word
+    # when they picked "Autre" and typed one.
     zone_label_fr: str
+    # Whether that name came from the customer rather than our list. The screen
+    # marks it, so nobody reads a typed-in room as one of our categories.
+    customer_named: bool = False
     bytes_size: int | None
     created_at: datetime
 

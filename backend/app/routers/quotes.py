@@ -104,6 +104,7 @@ async def upload_photo(
     request_id: str,
     token: str = Form(...),
     zone: str = Form(...),
+    zone_label: str | None = Form(None),
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
@@ -133,6 +134,11 @@ async def upload_photo(
         zone_value = PhotoZone(zone)
     except ValueError:
         raise HTTPException(status_code=422, detail="Pièce inconnue.") from None
+
+    # Kept only next to `other`. A label on a photo already tagged "cuisine" would
+    # be a second, contradictable name for the same thing, and the enum is what the
+    # admin screen groups by -- so the free text is the escape hatch and nothing more.
+    label = _clean_zone_label(zone_label) if zone_value is PhotoZone.other else None
 
     request = await session.get(QuoteRequest, request_id)
     if request is None:
@@ -168,6 +174,7 @@ async def upload_photo(
         QuotePhoto(
             request_id=request.id,
             zone=zone_value,
+            zone_label=label,
             storage_key=key,
             bytes_size=len(data),
         )
@@ -175,6 +182,23 @@ async def upload_photo(
     await session.commit()
     logger.info("photo.stored", request_id=str(request.id), zone=zone_value.value, bytes=len(data))
     return {"status": "stored", "zone": zone_value.value}
+
+
+# Anonymous free text that ends up on the operator's screen and in the quote email,
+# so it is bounded here rather than trusted. Not a validation error either way: a
+# label that will not do is dropped and the PHOTO IS STILL STORED -- losing the
+# picture over the word somebody typed above it would be a poor trade.
+_ZONE_LABEL_MAX = 60
+
+
+def _clean_zone_label(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    # Control characters out (a newline in a one-line field breaks the layout it
+    # lands in), runs of whitespace collapsed, then cut to the column's width.
+    text = "".join(" " if ch.isspace() else ch for ch in raw if ch.isprintable() or ch.isspace())
+    text = " ".join(text.split())[:_ZONE_LABEL_MAX].strip()
+    return text or None
 
 
 def _zone_offers(audience: str) -> list[PhotoZoneOffer]:

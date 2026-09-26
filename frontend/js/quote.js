@@ -296,6 +296,9 @@
       el.hidden = el.dataset.when !== current;
     });
     updatePrice();
+    /* Declared later in the file; a function declaration, so it exists by the time
+       any change event can reach here. */
+    syncPhotoZones();
   }
 
   form.querySelectorAll('input[name="property_type"]').forEach(function (el) {
@@ -680,6 +683,30 @@
   function applyCells() {
     if (!cells || !bedroomsField || !bathroomsField) return;
 
+    /* NO PRICED CELLS AT ALL is a different situation from a sparse grid, and
+       treating it as a sparse one is how this crashed.
+
+       With no active rate card -- which is exactly where this site stands until
+       Amine publishes real prices -- `cells` is empty, so every bedroom count
+       looks unpriceable, every option gets disabled, and nearest() below had
+       nothing left to pick: `options[0].value` on an empty array threw, inside the
+       form-config promise, whose .catch swallowed it. The visible effect was not
+       an error. It was the PHOTO BLOCK NEVER APPEARING, because mountPhotos() is
+       the next line after this one and never ran.
+
+       When nothing is priced there is nothing to gate on: leave the selects alone,
+       let the visitor answer, and let /api/quotes/price answer 409 -- which the
+       form already renders as "we price this one by hand". */
+    var anyPriced = Array.prototype.some.call(bedroomsField.options, function (option) {
+      return pricedBathrooms(optionValue(option)).length > 0;
+    });
+    if (!anyPriced) {
+      Array.prototype.forEach.call(bedroomsField.options, function (o) { o.disabled = false; });
+      Array.prototype.forEach.call(bathroomsField.options, function (o) { o.disabled = false; });
+      if (roomsNote) { roomsNote.textContent = ""; roomsNote.hidden = true; }
+      return;
+    }
+
     /* Bedrooms first. Disabling only the bathrooms meant a bedroom count with no
        row at all left every bathroom option disabled and the visitor stuck in a
        select they could not change, with nothing on screen saying why. */
@@ -688,7 +715,8 @@
     });
     var chosenBedrooms = bedroomsField.selectedOptions[0];
     if (chosenBedrooms && chosenBedrooms.disabled) {
-      bedroomsField.value = nearest(bedroomsField, optionValue(chosenBedrooms));
+      var moveTo = nearest(bedroomsField, optionValue(chosenBedrooms));
+      if (moveTo !== null) bedroomsField.value = moveTo;
     }
 
     var bedrooms = parseInt(bedroomsField.value, 10);
@@ -700,10 +728,13 @@
     var chosen = bathroomsField.selectedOptions[0];
     if (priced.length && chosen && chosen.disabled) {
       var was = optionValue(chosen);
-      bathroomsField.value = nearest(bathroomsField, was);
-      /* Their answer just changed under them and the price with it. Say so: a
-         number that moves on its own is the kind of thing that costs trust. */
-      say(T.roomsMoved.replace("{n}", bathroomsField.value));
+      var moved = nearest(bathroomsField, was);
+      if (moved !== null) {
+        bathroomsField.value = moved;
+        /* Their answer just changed under them and the price with it. Say so: a
+           number that moves on its own is the kind of thing that costs trust. */
+        say(T.roomsMoved.replace("{n}", bathroomsField.value));
+      }
     }
     if (roomsNote) {
       var missing = bathroomsField.options.length - priced.length;
@@ -712,8 +743,13 @@
     }
   }
 
+  /* The closest enabled option to `want`, or null when there is no enabled option
+     left. The caller has to handle null: returning options[0].value from an empty
+     array is a TypeError, and this one was thrown inside a promise whose .catch
+     made it invisible. */
   function nearest(field, want) {
     var options = Array.prototype.filter.call(field.options, function (o) { return !o.disabled; });
+    if (!options.length) return null;
     options.sort(function (a, b) {
       return Math.abs(optionValue(a) - want) - Math.abs(optionValue(b) - want);
     });
@@ -840,19 +876,35 @@
   /* ---------- photos (optional, and never in the way) ---------- */
 
   var picker = null;
+  var photoConfig = null;
 
   /* Shown only when the server says storage is on, and only with the zone list
      for the audience being asked -- a triplex has no workstations. Every failure
      here leaves the form exactly as it was: the block stays hidden and the
      visitor submits without photos, which is a worse quote and not a broken one. */
+  function zonesFor(audienceValue) {
+    if (!photoConfig) return null;
+    return audienceValue === "commercial"
+      ? photoConfig.photo_zones_commercial
+      : photoConfig.photo_zones_residential;
+  }
+
+  /* Called from applyAudience(), because the type of place is chosen AFTER this
+     picker is built: the photo block sits on step 1 under the tiles. Mounting once
+     at load left a shop being offered bedrooms and a basement. */
+  function syncPhotoZones() {
+    if (!picker) return;
+    var zones = zonesFor(audience());
+    if (zones && zones.length) picker.setZones(zones);
+  }
+
   function mountPhotos(config) {
     var block = document.getElementById("photo-block");
     var host = document.getElementById("photo-picker");
     if (!block || !host || !window.ProlinePhotos || !config.photos_enabled) return;
 
-    var zones = draftPayload().audience === "commercial"
-      ? config.photo_zones_commercial
-      : config.photo_zones_residential;
+    photoConfig = config;
+    var zones = zonesFor(audience());
     if (!zones || !zones.length) return;
 
     picker = new window.ProlinePhotos.Picker(host, {
@@ -1117,19 +1169,42 @@
 
   /* The card decides what the form may ask. If this call fails the form still
      works -- the visitor simply gets no extras, which is honest: we could not
-     have priced them anyway. */
+     have priced them anyway.
+
+     EACH STEP IS ON ITS OWN. They used to run as one block in a single .then, so
+     a throw anywhere in it landed in the .catch and everything after it was
+     skipped -- and the .catch is `hideExtrasField`, which reports nothing. A crash
+     in applyCells() therefore looked like "the photo block does not exist",
+     because mountPhotos() was the line after it. Nothing on screen, nothing in
+     the console, nothing to search for.
+
+     So: one try per step, the failure logged, and the steps that follow still run.
+     A visitor losing the extras list is a smaller loss than losing the photos, and
+     losing either silently is the real defect. */
+  function step(name, fn) {
+    try { fn(); }
+    catch (e) {
+      if (window.console && console.error) console.error("quote form: " + name + " failed", e);
+    }
+  }
+
   fetch("/api/quotes/form-config")
     .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
     .then(function (config) {
-      renderModifiers(config.modifiers || []);
-      renderExtras(config.extras || []);
-      cells = {};
-      (config.residential_cells || []).forEach(function (key) { cells[key] = true; });
-      applyDraft(savedDraft, EXTRA_FIELDS);
-      syncSteppers();
-      applyCells();
-      updatePrice();
-      mountPhotos(config);
+      step("modifiers", function () { renderModifiers(config.modifiers || []); });
+      step("extras", function () { renderExtras(config.extras || []); });
+      step("cells", function () {
+        cells = {};
+        (config.residential_cells || []).forEach(function (key) { cells[key] = true; });
+      });
+      step("draft", function () { applyDraft(savedDraft, EXTRA_FIELDS); });
+      step("steppers", syncSteppers);
+      step("rooms", applyCells);
+      step("price", updatePrice);
+      step("photos", function () { mountPhotos(config); });
     })
-    .catch(hideExtrasField);
+    .catch(function (err) {
+      hideExtrasField();
+      if (window.console && console.warn) console.warn("quote form: form-config unavailable", err);
+    });
 })();

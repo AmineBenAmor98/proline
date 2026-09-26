@@ -18,6 +18,16 @@ class QuotePhoto(TimestampedBase):
         ForeignKey("quote_requests.id", ondelete="CASCADE")
     )
     zone: Mapped[PhotoZone] = mapped_column(Enum(PhotoZone, name="photo_zone"), nullable=False)
+
+    # What the customer called the room, when our list had no word for it.
+    #
+    # Only ever set alongside zone == other, and it is the reason `other` is worth
+    # offering at all: "Autre" on a photo tells whoever writes the quote nothing,
+    # while "salle de lavage au sous-sol" tells them what they are looking at. Free
+    # text from an anonymous caller, so it is bounded and stripped on the way in
+    # (see the upload endpoint) and escaped on the way out.
+    zone_label: Mapped[str | None] = mapped_column(String(60))
+
     storage_key: Mapped[str] = mapped_column(String(400), nullable=False)
     bytes_size: Mapped[int | None] = mapped_column(Integer)
 
