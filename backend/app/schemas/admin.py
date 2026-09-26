@@ -74,6 +74,37 @@ class AdminRequestRow(BaseModel):
     gclid: str | None
 
 
+class AdminPhoto(BaseModel):
+    """One customer photo. The bytes come from GET /admin/photos/{id}, which is
+    behind the same auth as everything else here -- these are pictures of the
+    inside of somebody's home and must never be servable by URL alone."""
+
+    id: str
+    zone: str
+    zone_label_fr: str
+    bytes_size: int | None
+    created_at: datetime
+
+
+class AdminRequestDetail(AdminRequestRow):
+    """Everything the detail page shows.
+
+    Inherits the list row rather than restating thirty fields: the two would
+    drift, and the first sign of it would be a field that quietly shows in the
+    table and not on the page it links to. Only what the list has no room for
+    is added here.
+    """
+
+    photos: list[AdminPhoto] = []
+    computed_breakdown: dict | None = None
+    consent_given: bool = False
+    utm_source: str | None = None
+    utm_medium: str | None = None
+    landing_path: str | None = None
+    rate_card_version: str | None = None
+    offers: list[OfferSent] = []
+
+
 class AdminRequestList(BaseModel):
     items: list[AdminRequestRow]
     total: int
@@ -115,3 +146,10 @@ class OfferSent(BaseModel):
     status: str
     sent_at: datetime | None
     error: str | None
+
+
+# AdminRequestDetail names OfferSent in an annotation before OfferSent exists,
+# so Pydantic cannot resolve it when the class is built. Rebuilding here, once
+# both are defined, is the supported way round that -- and it beats reordering
+# the file around a forward reference that reads perfectly well where it is.
+AdminRequestDetail.model_rebuild()

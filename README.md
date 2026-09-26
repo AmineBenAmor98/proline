@@ -335,7 +335,7 @@ a size or a radius outside them is how this drifts, so don't.
 ## Deploy
 
 One **Lightsail instance in `ca-central-1` (Montreal)** runs everything — app,
-Postgres, nginx and certbot as containers. **$12/month.** The AWS side is Pulumi;
+Postgres, nginx, certbot and a daily photo-retention sweep as containers. **$12/month.** The AWS side is Pulumi;
 see `infra/pulumi/` and `infra/DEPLOY.md`. nginx terminates TLS and proxies to the
 app; certbot renews the certificate and nginx reloads on a timer to pick it up, so
 there is no cron and nothing to remember. The first certificate is the one manual

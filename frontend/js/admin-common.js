@@ -200,6 +200,34 @@ window.ProlineAdmin = (function () {
     });
   }
 
+  /* An authenticated GET that yields an object URL instead of JSON.
+   *
+   * Customer photos are served behind the admin token, so `<img src="/api/...">`
+   * cannot fetch them -- a plain image request carries no Authorization header
+   * and comes back 401, which renders as a broken-image icon and no explanation
+   * whatsoever. Fetching the bytes here and handing back a blob: URL is what
+   * makes an authenticated image displayable at all.
+   *
+   * The caller owns the URL it gets and must revokeObjectURL when done with it,
+   * or a long session leaks every photo it ever looked at.
+   */
+  function apiBlobUrl(path) {
+    var current = session();
+    return fetch("/api/admin" + path, {
+      headers: current ? { Authorization: "Bearer " + current.token } : {}
+    }).then(function (res) {
+      if (res.status === 401) {
+        setSession(null);
+        showLogin("Session expirée. Reconnectez-vous.");
+        return Promise.reject("auth");
+      }
+      if (!res.ok) return Promise.reject({ status: res.status, body: null });
+      return res.blob();
+    }, function () {
+      return Promise.reject({ status: 0, body: null });
+    }).then(function (blob) { return URL.createObjectURL(blob); });
+  }
+
   /* What went wrong, in French, and what to do about it.
 
      This used to pass FastAPI's `detail` straight through, so a dead database
@@ -338,7 +366,7 @@ window.ProlineAdmin = (function () {
   return {
     STATUS_LABELS: STATUS_LABELS, STATUS_ORDER: STATUS_ORDER, FREQUENCY_LABELS: FREQUENCY_LABELS,
     PROPERTY_LABELS: PROPERTY_LABELS, SERVICE_LABELS: SERVICE_LABELS,
-    boot: boot, api: api, apiMessage: apiMessage,
+    boot: boot, api: api, apiBlobUrl: apiBlobUrl, apiMessage: apiMessage,
     money: money, moneyExact: moneyExact, parseMoney: parseMoney,
     parseIntStrict: parseIntStrict, parseDecimalStrict: parseDecimalStrict,
     when: when, day: day, esc: esc

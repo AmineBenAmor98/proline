@@ -83,13 +83,15 @@ if FRONTEND_DIR.is_dir():
             url = "/en" if page.stem == "index" else f"/en/{page.stem}"
             _register_page(url, page)
 
-    # Two admin screens, both gated by the token their API calls carry.
-    admin_index = FRONTEND_DIR / "admin" / "index.html"
-    if admin_index.is_file():
-        _register_page("/admin", admin_index)
-    admin_rates = FRONTEND_DIR / "admin" / "tarifs.html"
-    if admin_rates.is_file():
-        _register_page("/admin/tarifs", admin_rates)
+    # The admin screens, gated by the token their API calls carry. Globbed the
+    # same way as the pages above rather than named one by one: the previous
+    # version listed two explicitly, so the third screen added was a 404 with
+    # nothing anywhere to explain why.
+    admin_dir = FRONTEND_DIR / "admin"
+    if admin_dir.is_dir():
+        for page in admin_dir.glob("*.html"):
+            url = "/admin" if page.stem == "index" else f"/admin/{page.stem}"
+            _register_page(url, page)
 
     # Mounted last so it never shadows the routes above.
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

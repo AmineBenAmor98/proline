@@ -264,6 +264,18 @@
             </div>
             <p class="note" style="margin-bottom:18px">Un courriel ou un téléphone suffit. Nous utilisons le canal que vous préférez.</p>
 
+            <!-- Photos. Hidden until the form config says storage is switched on,
+                 so PHOTOS_DIR is the single switch for the whole feature. -->
+            <section class="photo-block" id="photo-block" hidden>
+              <div class="photo-head">
+                <span class="photo-title">Photos</span>
+                <span class="photo-tag" id="photo-count">Facultatif</span>
+              </div>
+              <p class="note">Le prix dépend surtout de l'état des lieux. Avec quelques photos, nous confirmons un prix exact ; sans photos, l'estimation reste à valider sur place.</p>
+              <div id="photo-picker"></div>
+              <p class="note photo-privacy">Vos photos servent uniquement à préparer votre soumission. Elles sont conservées un an, puis supprimées.</p>
+            </section>
+
             <label class="checkbox-row">
               <input type="checkbox" name="consent_given" required aria-describedby="err-consent_given">
               <span>J'accepte que ces renseignements servent à répondre à ma demande.</span>
@@ -302,6 +314,18 @@
           <a class="btn btn-gold" href="/">Retour à l'accueil</a>
         </div>
       </div>
+
+      <!-- Photo upload progress. Shown AFTER the confirmation above, because by
+           the time it appears the request is already saved and this is the only
+           thing still in flight. -->
+      <div id="photo-progress" hidden class="photo-progress" role="status" aria-live="polite">
+        <div class="photo-progress-head">
+          <span class="photo-progress-title" id="photo-progress-title">Envoi des photos</span>
+          <span class="photo-progress-count" id="photo-progress-count"></span>
+        </div>
+        <div class="photo-bar"><div class="photo-bar-fill" id="photo-bar-fill"></div></div>
+        <p class="note" id="photo-progress-note">Vous pouvez fermer cette page — votre demande est déjà enregistrée.</p>
+      </div>
     </div>
   </section>
 </main>
@@ -323,6 +347,7 @@
   <a class="btn btn-ghost" href="tel:+15142424779">Appeler</a>
 </div>
 
+<script src="/js/photos.js"></script>
 <script src="/js/quote.js"></script>
 </body>
 </html>

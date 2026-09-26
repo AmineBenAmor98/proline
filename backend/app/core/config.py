@@ -78,6 +78,22 @@ class Settings(BaseSettings):
     mail_from: str = "Proline Cleaning Solutions <contact@proline-cleaningsolutions.com>"
     mail_reply_to: str = ""
 
+    # Customer photos. Empty disables the feature outright: the form hides the
+    # control and the upload endpoint answers 503. That is the switch to reach
+    # for if the disk is filling, rather than editing the frontend.
+    #
+    # THE DISK IS SHARED WITH POSTGRES. A full disk stops the database accepting
+    # writes, which loses leads -- so the two caps below are not fussiness, they
+    # are what bounds the worst case. The browser resizes to roughly 200 KB
+    # before uploading; photo_max_bytes only has to catch a client that did not.
+    # Worst case per request is photo_max_count x photo_max_bytes.
+    photos_dir: str = ""
+    photo_max_count: int = 10
+    photo_max_bytes: int = 2 * 1024 * 1024
+    # How long a photo is kept. These are pictures of the inside of somebody's
+    # home; keeping them indefinitely is a decision nobody made on purpose.
+    photo_retention_days: int = 365
+
     notify_email_to: str = ""
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""

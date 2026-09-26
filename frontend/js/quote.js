@@ -765,6 +765,64 @@
     if (event.target.name === "consent_given") clearError("consent_given");
   });
 
+  /* ---------- photos (optional, and never in the way) ---------- */
+
+  var picker = null;
+
+  /* Shown only when the server says storage is on, and only with the zone list
+     for the audience being asked -- a triplex has no workstations. Every failure
+     here leaves the form exactly as it was: the block stays hidden and the
+     visitor submits without photos, which is a worse quote and not a broken one. */
+  function mountPhotos(config) {
+    var block = document.getElementById("photo-block");
+    var host = document.getElementById("photo-picker");
+    if (!block || !host || !window.ProlinePhotos || !config.photos_enabled) return;
+
+    var zones = draftPayload().audience === "commercial"
+      ? config.photo_zones_commercial
+      : config.photo_zones_residential;
+    if (!zones || !zones.length) return;
+
+    picker = new window.ProlinePhotos.Picker(host, {
+      locale: EN ? "en" : "fr",
+      maxCount: config.photo_max_count || 10,
+      zones: zones
+    });
+
+    var tag = document.getElementById("photo-count");
+    var optional = tag ? tag.textContent : "";
+    picker.onChange = function (count) {
+      if (!tag) return;
+      tag.textContent = count
+        ? window.ProlinePhotos.text(EN ? "en" : "fr").selected(count)
+        : optional;
+      tag.classList.toggle("is-set", count > 0);
+    };
+    block.hidden = false;
+  }
+
+  /* Runs after the confirmation is already on screen. Nothing it does can cost
+     the visitor their request -- that was committed before this was called. */
+  function uploadPhotos(requestId, token) {
+    if (!picker || !picker.count() || !token) return;
+    var box = document.getElementById("photo-progress");
+    var fill = document.getElementById("photo-bar-fill");
+    var count = document.getElementById("photo-progress-count");
+    var note = document.getElementById("photo-progress-note");
+    var strings = window.ProlinePhotos.text(EN ? "en" : "fr");
+    if (!box) return;
+
+    box.hidden = false;
+    picker.upload(requestId, token, function (done, total) {
+      if (count) count.textContent = strings.ofCount(done, total);
+      if (fill) fill.style.width = Math.round((done / total) * 100) + "%";
+    }).then(function (result) {
+      if (fill) fill.style.width = "100%";
+      if (note) note.textContent = result.failed ? strings.failed : strings.done;
+      if (count) count.textContent = strings.ofCount(result.sent, result.total);
+    });
+  }
+
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     /* Re-check every step, not just this one: someone can walk back with the pills,
@@ -838,6 +896,9 @@
         if (done.focus) done.focus({ preventScroll: true });
         if (window.gtag) window.gtag("event", "generate_lead", { value: 1 });
         scrollToTop();
+        /* Last, deliberately: the lead is saved, the confirmation is on screen,
+           and only now does anything large start moving over the network. */
+        uploadPhotos(result.id, result.photo_upload_token);
       })
       .catch(function (err) {
         submitBtn.disabled = false;
@@ -911,6 +972,7 @@
       syncSteppers();
       applyCells();
       updatePrice();
+      mountPhotos(config);
     })
     .catch(hideExtrasField);
 })();

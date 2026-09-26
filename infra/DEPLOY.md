@@ -347,6 +347,31 @@ fails silently two months later.
 - **Replace the placeholder prices** with real figures. The site quotes whatever
   is published.
 
+- **Watch the disk, because photos land on it.** Customer photos go in the
+  `photos` volume, on the same 60 GB disk as Postgres, and a full disk stops the
+  database accepting writes — which loses leads, silently. The browser resizes
+  each photo to roughly 200 KB before upload and the app caps count and size, so
+  the realistic rate is about 1 MB per request; that is years of headroom, not
+  months. Check it occasionally rather than trusting the arithmetic:
+
+  ```sh
+  df -h /                                      # past 60% is the moment to act
+  docker system df -v | grep proline_photos    # what the photos themselves use
+  ```
+
+  Photos older than `PHOTO_RETENTION_DAYS` (a year by default) are deleted daily
+  by the `photo-prune` container. To see what it would remove without removing
+  anything:
+
+  ```sh
+  docker compose -f infra/docker-compose.prod.yml \
+    run --rm --entrypoint "python -m scripts.prune_photos --dry-run" photo-prune
+  ```
+
+  Turning photos off entirely is one variable: unset `PHOTOS_DIR` and redeploy.
+  The form hides its photo control and the upload endpoint answers 503 — no
+  frontend change needed.
+
 ---
 
 ## Updating later

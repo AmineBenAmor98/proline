@@ -9,6 +9,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,9 +21,11 @@ from app.core.security import (
     require_admin,
 )
 from app.db.session import get_session
-from app.models import Lead, OfferEmail, Property, Quote, QuoteRequest
-from app.models.enums import RequestStatus
+from app.models import Lead, OfferEmail, Property, Quote, QuotePhoto, QuoteRequest
+from app.models.enums import PHOTO_ZONE_LABELS_FR, RequestStatus
 from app.schemas.admin import (
+    AdminPhoto,
+    AdminRequestDetail,
     AdminRequestList,
     AdminRequestPatch,
     AdminRequestRow,
@@ -34,8 +37,14 @@ from app.schemas.admin import (
     RequestedItem,
 )
 from app.services import offers
+from app.services import photos as photo_store
 from app.services.mailer import MailNotConfigured
 from app.services.rate_cards import get_active_rate_card
+
+# What we serve each stored extension as. Derived from the magic bytes we
+# sniffed at upload, never from the name the customer's browser sent -- serving
+# a file as a type it is not is how a stored image becomes a stored script.
+MEDIA_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 
 # Sign-in is public; everything else needs the token it returns.
 public_router = APIRouter(prefix="/admin", tags=["admin"])
@@ -68,7 +77,7 @@ def _extras(request: QuoteRequest, card_extras: dict) -> list[RequestedItem]:
     an extra retired from the card still reads as something.
     """
     priced = {}
-    for line in ((request.computed_breakdown or {}).get("lines") or []):
+    for line in (request.computed_breakdown or {}).get("lines") or []:
         code = str(line.get("code", ""))
         if code.startswith("extra:"):
             priced[code[6:]] = line
@@ -223,6 +232,123 @@ async def _request_with_people(session: AsyncSession, request_id: UUID):
     return found
 
 
+@router.get("/requests/{request_id}", response_model=AdminRequestDetail)
+async def request_detail(
+    request_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> AdminRequestDetail:
+    """Everything known about one request, for the detail page.
+
+    One call, not five. The page shows photos, contact, property, pricing and
+    the offers already sent together, and five round-trips to paint one screen
+    is five chances for a partly-rendered page.
+    """
+    request, lead, prop = await _request_with_people(session, request_id)
+
+    active = await get_active_rate_card(session)
+    grid = (active.grid or {}) if active else {}
+    quoted = await session.scalar(select(Quote.total_cents).where(Quote.request_id == request.id))
+
+    photos = (
+        (
+            await session.execute(
+                select(QuotePhoto)
+                .where(QuotePhoto.request_id == request.id)
+                # Grouped by room, then oldest first, so the same property always
+                # reads in the same order however the customer happened to pick.
+                .order_by(QuotePhoto.zone, QuotePhoto.created_at)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    offers = (
+        (
+            await session.execute(
+                select(OfferEmail)
+                .where(OfferEmail.request_id == request.id)
+                .order_by(OfferEmail.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    row = _row(
+        request, lead, prop, quoted, grid.get("extras", {}), grid.get("residential_modifiers", {})
+    )
+
+    return AdminRequestDetail(
+        **row.model_dump(),
+        photos=[
+            AdminPhoto(
+                id=str(photo.id),
+                zone=photo.zone.value,
+                zone_label_fr=PHOTO_ZONE_LABELS_FR.get(photo.zone, photo.zone.value),
+                bytes_size=photo.bytes_size,
+                created_at=photo.created_at,
+            )
+            for photo in photos
+        ],
+        computed_breakdown=request.computed_breakdown,
+        consent_given=lead.consent_given,
+        utm_source=lead.utm_source,
+        utm_medium=lead.utm_medium,
+        landing_path=lead.landing_path,
+        rate_card_version=active.version if active else None,
+        offers=[
+            OfferSent(
+                id=offer.id,
+                to_email=offer.to_email,
+                subject=offer.subject,
+                total_cents=offer.total_cents,
+                status=offer.status,
+                sent_at=offer.sent_at,
+                error=offer.error,
+            )
+            for offer in offers
+        ],
+    )
+
+
+@router.get("/photos/{photo_id}")
+async def photo_bytes(
+    photo_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> FileResponse:
+    """The image itself, behind admin auth.
+
+    Not served as a static directory, and that is the point: these are photos of
+    the inside of a customer's home. A static mount would make every one of them
+    readable by anyone who learns the path, forever, with no way to revoke it.
+    Going through a route means the session check happens on every single fetch.
+    """
+    if not settings.photos_dir:
+        raise HTTPException(status_code=503, detail="photo storage is not configured")
+
+    photo = await session.get(QuotePhoto, photo_id)
+    if photo is None:
+        raise HTTPException(status_code=404, detail="photo not found")
+
+    try:
+        path = photo_store.resolve(settings.photos_dir, photo.storage_key)
+    except photo_store.PhotoRejected:
+        raise HTTPException(status_code=404, detail="photo not found") from None
+    if not path.is_file():
+        # The row outlived the file: a restore that missed the volume, or the
+        # retention sweep. Say so rather than throwing a 500 at the admin.
+        raise HTTPException(status_code=410, detail="photo file is gone")
+
+    return FileResponse(
+        path,
+        media_type=MEDIA_TYPES.get(path.suffix.lstrip("."), "application/octet-stream"),
+        # Not for a CDN to hold and not for a shared proxy: private.
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
 @router.patch("/requests/{request_id}", response_model=AdminRequestRow)
 async def update_request(
     # Typed as a UUID so a malformed id is a 422 from FastAPI. As a plain str it
@@ -237,8 +363,10 @@ async def update_request(
         request.status = payload.status
 
     quote = (
-        await session.execute(select(Quote).where(Quote.request_id == request.id))
-    ).scalars().first()
+        (await session.execute(select(Quote).where(Quote.request_id == request.id)))
+        .scalars()
+        .first()
+    )
 
     # Notes used to be read only inside the price branch, so
     # PATCH {"notes": "rappelle lundi"} answered 200 and wrote nothing.
@@ -268,8 +396,12 @@ async def update_request(
     active = await get_active_rate_card(session)
     grid = (active.grid or {}) if active else {}
     return _row(
-        request, lead, prop, quote.total_cents if quote else None,
-        grid.get("extras", {}), grid.get("residential_modifiers", {}),
+        request,
+        lead,
+        prop,
+        quote.total_cents if quote else None,
+        grid.get("extras", {}),
+        grid.get("residential_modifiers", {}),
     )
 
 
@@ -290,8 +422,11 @@ async def preview_offer(
     """
     _request, lead, prop = await _request_with_people(session, request_id)
     subject, text = offers.render(
-        settings, lead=lead, prop=prop,
-        message=payload.message, total_cents=payload.total_cents,
+        settings,
+        lead=lead,
+        prop=prop,
+        message=payload.message,
+        total_cents=payload.total_cents,
     )
     return OfferPreview(subject=subject, text=text, to_email=lead.email)
 
@@ -315,9 +450,13 @@ async def send_offer(
 
     try:
         record = await offers.send_offer(
-            settings, session,
-            lead=lead, prop=prop, request=request,
-            message=payload.message, total_cents=payload.total_cents,
+            settings,
+            session,
+            lead=lead,
+            prop=prop,
+            request=request,
+            message=payload.message,
+            total_cents=payload.total_cents,
         )
     except MailNotConfigured:
         # The failed OfferEmail row is rolled back with the request: nothing was
@@ -326,7 +465,7 @@ async def send_offer(
         raise HTTPException(
             status_code=503,
             detail="L'envoi de courriels n'est pas configuré (SMTP_HOST). "
-                   "Aucun courriel n'a été envoyé.",
+            "Aucun courriel n'a été envoyé.",
         ) from None
     except Exception as exc:
         # The provider refused it. The row IS kept -- that attempt happened and
@@ -340,8 +479,10 @@ async def send_offer(
     # The price that was actually promised, on the quote row the rest of the
     # admin reads.
     quote = (
-        await session.execute(select(Quote).where(Quote.request_id == request.id))
-    ).scalars().first()
+        (await session.execute(select(Quote).where(Quote.request_id == request.id)))
+        .scalars()
+        .first()
+    )
     if quote is None:
         quote = Quote(
             request_id=request.id,
@@ -360,9 +501,13 @@ async def send_offer(
 
     await session.commit()
     return OfferSent(
-        id=record.id, to_email=record.to_email, subject=record.subject,
-        total_cents=record.total_cents, status=record.status,
-        sent_at=record.sent_at, error=record.error,
+        id=record.id,
+        to_email=record.to_email,
+        subject=record.subject,
+        total_cents=record.total_cents,
+        status=record.status,
+        sent_at=record.sent_at,
+        error=record.error,
     )
 
 
@@ -374,17 +519,25 @@ async def list_offers(
 ) -> list[OfferSent]:
     """Everything sent for this request, newest first — including failures."""
     rows = (
-        await session.execute(
-            select(OfferEmail)
-            .where(OfferEmail.request_id == request_id)
-            .order_by(OfferEmail.created_at.desc())
+        (
+            await session.execute(
+                select(OfferEmail)
+                .where(OfferEmail.request_id == request_id)
+                .order_by(OfferEmail.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [
         OfferSent(
-            id=r.id, to_email=r.to_email, subject=r.subject,
-            total_cents=r.total_cents, status=r.status,
-            sent_at=r.sent_at, error=r.error,
+            id=r.id,
+            to_email=r.to_email,
+            subject=r.subject,
+            total_cents=r.total_cents,
+            status=r.status,
+            sent_at=r.sent_at,
+            error=r.error,
         )
         for r in rows
     ]

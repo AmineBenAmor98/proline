@@ -12,7 +12,7 @@ table in `frontend/js/admin-common.js` and the checkboxes in
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated
 
 from pydantic import BaseModel, EmailStr, Field, model_validator
@@ -151,6 +151,19 @@ class ModifierOffer(BaseModel):
     options: list[ModifierOptionOut]
 
 
+class PhotoZoneOffer(BaseModel):
+    """One option in the per-photo room selector, already in both languages.
+
+    Defined up here, above FormConfig, because Pydantic resolves a model's
+    annotations when the class is built -- a name defined further down the file
+    is not there yet, `from __future__ import annotations` or not.
+    """
+
+    value: str
+    label_fr: str
+    label_en: str
+
+
 class FormConfig(BaseModel):
     """What the active rate card can price, and therefore what the form may ask.
 
@@ -172,6 +185,15 @@ class FormConfig(BaseModel):
     # two fields, so the form offered every combination and sent seven of them
     # into "a person will call you" after promising a price.
     residential_cells: list[str]
+    # Photos. The form asks whether to show the control at all rather than
+    # deciding for itself, so switching PHOTOS_DIR off in .env takes the input
+    # off the page too -- one switch, not two places to remember.
+    photos_enabled: bool = False
+    photo_max_count: int = 0
+    # Only the zones that make sense for the audience being asked. One enum in
+    # the database, two lists on the forms: a triplex has no workstations.
+    photo_zones_residential: list[PhotoZoneOffer] = []
+    photo_zones_commercial: list[PhotoZoneOffer] = []
 
 
 class PriceLine(BaseModel):
@@ -206,6 +228,21 @@ class QuoteRequestOut(BaseModel):
     price: PriceOut | None = None
     message_fr: str
     message_en: str
+    # Authorises uploading photos to THIS request, for an hour. Null when photo
+    # storage is switched off, and null for a honeypot submission -- which gets
+    # a cheerful 201 and no way to write anything to disk.
+    photo_upload_token: str | None = None
+
+
+class PhotoOut(BaseModel):
+    """A stored photo, as the admin sees it. Never the bytes -- those come from
+    the authenticated photo endpoint, one request each."""
+
+    id: str
+    zone: str
+    zone_label_fr: str
+    bytes_size: int | None = None
+    created_at: datetime
 
 
 class PriceDraftIn(BaseModel):

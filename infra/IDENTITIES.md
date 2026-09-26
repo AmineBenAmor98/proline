@@ -130,6 +130,19 @@ in the company mailbox and the copy is a convenience on top.
 
 ## 5. Where every secret physically is
 
+There is one more credential-shaped thing that is deliberately **not** in the
+table below: the **photo upload token**. When a customer submits the quote form,
+the API hands their browser a token signed with `SECRET_KEY` that authorises
+uploading photos to that one request, for one hour. It is not stored anywhere —
+the expiry is inside the token — and it grants nothing except attaching an image
+to a request that already exists. It exists because the customer is anonymous:
+there is no session to check, and without it the upload endpoint would write
+files to disk for anyone who can guess a request id, which is not secret.
+
+Reading photos back is a different matter and uses the ordinary admin token:
+`GET /api/admin/photos/{id}`. They are never served as static files, because a
+static path is readable forever by anyone who learns it.
+
 | Secret | Lives in | Also in |
 |---|---|---|
 | AWS admin access key | `~/.aws/credentials` on your laptop | — |

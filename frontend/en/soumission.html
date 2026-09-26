@@ -264,6 +264,18 @@
             </div>
             <p class="note" style="margin-bottom:18px">An email or a phone number is enough. We use whichever you prefer.</p>
 
+            <!-- Photos. Hidden until the form config says storage is switched on,
+                 so PHOTOS_DIR is the single switch for the whole feature. -->
+            <section class="photo-block" id="photo-block" hidden>
+              <div class="photo-head">
+                <span class="photo-title">Photos</span>
+                <span class="photo-tag" id="photo-count">Optional</span>
+              </div>
+              <p class="note">The price depends mostly on the state of the place. With a few photos we can confirm an exact price; without them, the estimate still has to be checked on site.</p>
+              <div id="photo-picker"></div>
+              <p class="note photo-privacy">Your photos are used only to prepare your quote. They are kept for one year and then deleted.</p>
+            </section>
+
             <label class="checkbox-row">
               <input type="checkbox" name="consent_given" required aria-describedby="err-consent_given">
               <span>I agree that this information may be used to answer my request.</span>
@@ -302,6 +314,18 @@
           <a class="btn btn-gold" href="/en">Back to home</a>
         </div>
       </div>
+
+      <!-- Photo upload progress. Shown AFTER the confirmation above, because by
+           the time it appears the request is already saved and this is the only
+           thing still in flight. -->
+      <div id="photo-progress" hidden class="photo-progress" role="status" aria-live="polite">
+        <div class="photo-progress-head">
+          <span class="photo-progress-title" id="photo-progress-title">Uploading photos</span>
+          <span class="photo-progress-count" id="photo-progress-count"></span>
+        </div>
+        <div class="photo-bar"><div class="photo-bar-fill" id="photo-bar-fill"></div></div>
+        <p class="note" id="photo-progress-note">You can close this page — your request is already saved.</p>
+      </div>
     </div>
   </section>
 </main>
@@ -323,6 +347,7 @@
   <a class="btn btn-ghost" href="tel:+15142424779">Call</a>
 </div>
 
+<script src="/js/photos.js"></script>
 <script src="/js/quote.js"></script>
 </body>
 </html>

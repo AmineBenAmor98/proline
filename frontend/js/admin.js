@@ -92,7 +92,13 @@
   }
 
   function contactCell(row) {
-    var lines = ["<strong>" + A.esc(row.full_name) + "</strong>"];
+    /* The name is the way into the full request -- photos, access notes and the
+       rest of what does not fit in a table row. Linking the name rather than
+       adding a "view" column keeps the table the width it already is. */
+    var lines = [
+      '<a class="rowlink" href="/admin/demande?id=' + A.esc(row.id) + '">' +
+        "<strong>" + A.esc(row.full_name) + "</strong></a>"
+    ];
     if (row.company) lines.push(A.esc(row.company));
     if (row.phone) lines.push('<a href="tel:' + A.esc(row.phone) + '">' + A.esc(row.phone) + "</a>");
     if (row.email) lines.push('<a href="mailto:' + A.esc(row.email) + '">' + A.esc(row.email) + "</a>");

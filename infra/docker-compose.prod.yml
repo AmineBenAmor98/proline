@@ -57,6 +57,11 @@ services:
     environment:
       ENVIRONMENT: production
       FRONTEND_DIR: /app/frontend
+      # Customer photos. Setting this is what switches the feature on: the form
+      # hides its photo control and the upload endpoint answers 503 without it.
+      PHOTOS_DIR: /srv/photos
+    volumes:
+      - photos:/srv/photos
     expose: ["8000"]
     depends_on:
       db: {condition: service_healthy}
@@ -66,6 +71,37 @@ services:
       timeout: 5s
       start_period: 40s
       retries: 3
+
+  # Deletes photos past their retention window, once a day.
+  #
+  # The form tells customers their photos are kept for a year and then deleted.
+  # A promise with nothing enforcing it is a sentence on a web page, so this runs
+  # whether or not anybody remembers it exists -- which, on a box nobody logs
+  # into for months, is the only kind of cleanup that actually happens.
+  #
+  # Same image as the app, so it needs no build of its own and cannot drift from
+  # the code that wrote the rows. The loop mirrors the certbot service below
+  # rather than inventing a second scheduling style for the same stack.
+  photo-prune:
+    image: proline-app:latest
+    restart: unless-stopped
+    env_file: /srv/proline/.env
+    environment:
+      ENVIRONMENT: production
+      PHOTOS_DIR: /srv/photos
+    volumes:
+      - photos:/srv/photos
+    depends_on:
+      db: {condition: service_healthy}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        trap exit TERM
+        while :; do
+          python -m scripts.prune_photos || true
+          sleep 24h & wait $${!}
+        done
 
   # TLS and routing. nginx serves, certbot below keeps the certificate alive --
   # two containers doing what Caddy did in one, which is the trade accepted when
@@ -173,3 +209,7 @@ volumes:
   # The ACME challenge webroot: certbot writes a token here, nginx serves it.
   # Nothing in it needs to survive; it exists only to be shared between the two.
   certbot_www:
+  # Customer photos. On the same disk as pgdata, which is the reason the app
+  # caps both their size and their number: a full disk stops Postgres accepting
+  # writes, and that loses leads. Watch it with `df -h /` -- see infra/DEPLOY.md.
+  photos:

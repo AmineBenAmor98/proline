@@ -6,7 +6,7 @@ import pytest
 PAGES = [
     "/", "/soumission", "/commercial",
     "/en", "/en/soumission", "/en/commercial",
-    "/admin", "/admin/tarifs",
+    "/admin", "/admin/tarifs", "/admin/demande",
 ]
 
 
@@ -21,6 +21,7 @@ async def test_static_assets_are_served(client):
     for path in [
         "/css/app.css", "/js/quote.js",
         "/js/admin-common.js", "/js/admin.js", "/js/rates.js",
+        "/js/photos.js", "/js/demande.js",
     ]:
         response = await client.get(path)
         assert response.status_code == 200, path

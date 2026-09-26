@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Demande — Proline Admin</title>
+<link rel="icon" href="/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Karla:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body class="admin-body">
+
+<div id="panel" hidden>
+  <div class="goldbar"></div>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/admin">
+        <img src="/img/logo.png" alt="" width="42" height="42">
+        <span class="brand-text">
+          <span class="brand-name">PROLINE</span>
+          <span class="brand-sub">Admin</span>
+        </span>
+      </a>
+      <nav class="site-nav">
+        <a class="navlink" href="/admin" aria-current="page">Demandes</a>
+        <a class="navlink" href="/admin/tarifs">Tarifs</a>
+        <a class="navlink" href="/" target="_blank" rel="noopener">Voir le site</a>
+        <span class="lang" id="who"></span>
+        <button class="btn btn-ghost" id="refresh-btn" type="button">Rafraîchir</button>
+        <button class="btn btn-ghost" id="logout-btn" type="button">Déconnexion</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container admin-wrap">
+    <a class="backlink" href="/admin">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m15 18-6-6 6-6"/>
+      </svg>
+      Toutes les demandes
+    </a>
+
+    <div id="panel-error" class="alert" hidden role="alert"></div>
+    <p id="loading" class="note">Chargement…</p>
+
+    <div id="detail" hidden>
+      <div class="detail-head">
+        <div>
+          <h1 id="d-title"></h1>
+          <p class="note" id="d-meta"></p>
+        </div>
+        <span class="statuschip" id="d-status"></span>
+      </div>
+
+      <div class="detail-cols">
+        <!-- main column -->
+        <div class="detail-main">
+          <section class="card" id="photos-card" hidden>
+            <div class="card-head">
+              <h2>Photos du client</h2>
+              <span class="photo-tag is-set" id="d-photo-count"></span>
+            </div>
+            <div class="admin-photo-grid" id="d-photos"></div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2>La demande</h2></div>
+            <dl class="factgrid" id="d-request"></dl>
+            <div id="d-notes-wrap" hidden>
+              <span class="field-label">Notes d'accès</span>
+              <p id="d-notes"></p>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2>Prix calculé</h2></div>
+            <div id="d-breakdown"></div>
+          </section>
+        </div>
+
+        <!-- side column: the decision first, reference material under it -->
+        <div class="detail-side">
+          <section class="card card-action">
+            <div class="field">
+              <label for="offer-price">Prix à envoyer</label>
+              <input type="text" id="offer-price" inputmode="decimal" placeholder="250,00 $">
+            </div>
+            <p class="note" id="d-computed-hint"></p>
+            <button type="button" class="btn btn-gold btn-lg" id="offer-open">Envoyer l'offre</button>
+            <div class="action-foot">
+              <span id="d-offer-state"></span>
+              <select id="d-status-pick" class="statuspick" aria-label="Statut"></select>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2>Coordonnées</h2></div>
+            <div id="d-contact"></div>
+            <dl class="factgrid factgrid-2" id="d-contact-facts"></dl>
+          </section>
+
+          <section class="card">
+            <div class="card-head"><h2>La propriété</h2></div>
+            <dl class="factgrid factgrid-3" id="d-property"></dl>
+          </section>
+
+          <section class="card" id="source-card" hidden>
+            <div class="card-head"><h2>Provenance</h2></div>
+            <dl class="factgrid factgrid-2" id="d-source"></dl>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Same composer as the inbox: sending is irreversible and goes to a stranger,
+     so it gets the whole screen and an explicit second step. -->
+<div class="modal" id="offer" hidden>
+  <div class="modal-card" id="offer-card" role="dialog" aria-modal="true"
+       aria-labelledby="offer-title" tabindex="-1">
+    <h2 id="offer-title">Envoyer l'offre</h2>
+    <p class="note" id="offer-to"></p>
+
+    <div class="field">
+      <label for="offer-message">Votre message</label>
+      <textarea id="offer-message" rows="5"></textarea>
+      <p class="note">Le prix, la propriété et vos coordonnées sont ajoutés
+        automatiquement — écrivez seulement ce que vous voulez dire.</p>
+    </div>
+
+    <div class="field">
+      <span class="field-label">Ce qui sera envoyé</span>
+      <pre id="offer-preview" class="offer-preview">—</pre>
+    </div>
+
+    <div id="offer-error" class="alert" hidden role="alert"></div>
+
+    <div class="row" style="justify-content:flex-end">
+      <button type="button" class="btn btn-ghost" id="offer-cancel">Annuler</button>
+      <button type="button" class="btn btn-primary" id="offer-send" disabled>
+        Envoyer à ce client</button>
+    </div>
+  </div>
+</div>
+
+<!-- A photo at full size. Not a new tab: the image needs the admin token, and a
+     tab would ask for it without one and show a 401. -->
+<div class="modal" id="lightbox" hidden>
+  <div class="modal-card lightbox-card" role="dialog" aria-modal="true"
+       aria-label="Photo" tabindex="-1" id="lightbox-card">
+    <img id="lightbox-img" alt="">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <span class="note" id="lightbox-caption"></span>
+      <button type="button" class="btn btn-ghost" id="lightbox-close">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/admin-common.js"></script>
+<script src="/js/demande.js"></script>
+</body>
+</html>
