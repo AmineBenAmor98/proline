@@ -39,8 +39,26 @@
                              : "Cochez pour que nous puissions vous répondre.",
     areaRequired: EN ? "Give an approximate area, even a rough one."
                      : "Indiquez une superficie approximative, même grossière.",
-    areaRange: EN ? "Enter an area between 100 and 1,000,000 sq ft."
-                  : "Entrez une superficie entre 100 et 1 000 000 pi².",
+    /* The bounds are read off the input, not written here: they have to be the
+       ones the API enforces, and the API's copy is already in the markup. */
+    areaRange: function (min, max) {
+      return EN ? "Enter an area between " + num(min) + " and " + num(max) + " sq ft."
+                : "Entrez une superficie entre " + num(min) + " et " + num(max) + " pi².";
+    },
+    range: function (min, max) {
+      if (min === null) return EN ? "Enter " + num(max) + " at most." : "Entrez " + num(max) + " au maximum.";
+      if (max === null) return EN ? "Enter " + num(min) + " at least." : "Entrez " + num(min) + " au minimum.";
+      return EN ? "Enter a number between " + num(min) + " and " + num(max) + "."
+                : "Entrez un nombre entre " + num(min) + " et " + num(max) + ".";
+    },
+    tooLong: EN ? "This answer is too long — shorten it a little."
+                : "Cette réponse est trop longue : raccourcissez-la un peu.",
+    /* The last resort, and it must still NOT be the phone number: something was
+       out of range, which the visitor can fix, so name it and let them. */
+    rejected: function (what) {
+      return EN ? "One answer was not accepted: " + what + ". Correct it and send again."
+                : "Une réponse n'a pas été acceptée : " + what + ". Corrigez-la et renvoyez.";
+    },
     quotedIn24: EN ? "Quoted within 24 h" : "Chiffré sous 24 h",
     byArea: EN ? "counted from the area" : "calculé selon la superficie",
     howMany: EN ? "How many" : "Combien",
@@ -94,6 +112,13 @@
     return String(text == null ? "" : text).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
+  }
+
+  /* 1000000 -> "1 000 000" in French, "1,000,000" in English. A limit the visitor
+     cannot read at a glance is not much of an explanation. */
+  function num(n) {
+    try { return Number(n).toLocaleString(EN ? "en-CA" : "fr-CA"); }
+    catch (e) { return String(n); }
   }
 
   function number(name) {
@@ -216,9 +241,12 @@
 
   /* ---------- inline errors ---------- */
 
+  /* Returns whether the message reached the screen. A field with no error
+     paragraph silently swallowed everything written to it, which is how a 422
+     could be "handled" and still show the visitor nothing at all. */
   function fieldError(name, message) {
     var box = document.getElementById("err-" + name);
-    if (!box) return;
+    if (!box) return false;
     box.textContent = message;
     box.hidden = !message;
     var input = form.elements[name];
@@ -226,6 +254,7 @@
       if (message) input.setAttribute("aria-invalid", "true");
       else input.removeAttribute("aria-invalid");
     }
+    return true;
   }
 
   function clearError(name) { fieldError(name, ""); }
@@ -360,11 +389,54 @@
       if (audience() === null) { fieldError("property_type", T.typeRequired); ok = false; }
       else clearError("property_type");
 
+      var areaEl = form.elements.area_sqft;
+      var bounds = limits(areaEl);
       var area = number("area_sqft");
       if (area === null) { fieldError("area_sqft", T.areaRequired); ok = false; }
-      else if (area < 100 || area > 1000000) { fieldError("area_sqft", T.areaRange); ok = false; }
-      else clearError("area_sqft");
+      else if (!within(area, bounds)) {
+        fieldError("area_sqft", T.areaRange(bounds.min, bounds.max)); ok = false;
+      } else clearError("area_sqft");
+
+      if (!checkNumbers()) ok = false;
     }
+    return ok;
+  }
+
+  function limits(el) {
+    return {
+      min: el && el.min !== "" ? Number(el.min) : null,
+      max: el && el.max !== "" ? Number(el.max) : null
+    };
+  }
+
+  function within(n, bounds) {
+    if (!isFinite(n)) return false;
+    if (bounds.min !== null && n < bounds.min) return false;
+    if (bounds.max !== null && n > bounds.max) return false;
+    return true;
+  }
+
+  /* EVERY NUMBER FIELD, against the min and max already on it.
+     The form is `novalidate` -- deliberately, so the wizard owns its own messages
+     instead of the browser's -- and that turns those attributes into decoration
+     unless something reads them. Nothing did. A shop entered with 222 washrooms
+     walked through all three steps, and the API's cap of 200 came back as a 422
+     the form could not map to a field, so the visitor was told "sending failed,
+     call us" over a number they could have corrected in two seconds.
+
+     Hidden fields are skipped for the same reason draftPayload() skips them: the
+     other audience's answers stay in the form and are not sent. */
+  function checkNumbers() {
+    var ok = true;
+    Array.prototype.forEach.call(form.querySelectorAll('input[type="number"]'), function (el) {
+      if (!el.name || el.name === "area_sqft") return;   // area has its own wording
+      if (el.closest("[hidden]")) { clearError(el.name); return; }
+      if (el.value === "") { clearError(el.name); return; }  // absence is a different question
+      var bounds = limits(el);
+      if (within(Number(el.value), bounds)) { clearError(el.name); return; }
+      fieldError(el.name, T.range(bounds.min, bounds.max));
+      ok = false;
+    });
     return ok;
   }
 
@@ -903,36 +975,121 @@
       .catch(function (err) {
         submitBtn.disabled = false;
         submitBtn.textContent = T.submit;
-        if (err && err.status === 422) {
-          if (applyServerErrors(err.body)) {
-            errorBox.textContent = T.fixFields;
-            errorBox.hidden = false;
-            showStep(3);
-            focusFirstError();
-            return;
-          }
-        }
+        /* applyServerErrors marks the fields, writes the message and moves to the
+           step that holds the problem -- it knows which step that is and this
+           does not. T.failed is only for a send that genuinely did not arrive. */
+        if (err && err.status === 422 && applyServerErrors(err.body)) return;
         errorBox.textContent = T.failed;
         errorBox.hidden = false;
       });
   });
 
-  /* FastAPI reports {detail: [{loc: ["body", "contact", "email"], msg: ...}]}.
-     Only the contact fields are reachable by a visitor, so map those and treat
-     anything else as a genuine failure. */
+  /* EVERY FIELD THE API CAN REJECT, with the step it lives on.
+
+     This used to map three of them -- email, full_name, phone -- and treat
+     everything else as "a genuine failure", which meant T.failed: "sending
+     failed, call us at 514 242-4779". That is not what happened. Nothing failed;
+     one answer was out of range, and the visitor was sent to the telephone over
+     something they could have fixed themselves. It cost a real support call.
+
+     The messages here are the same ones step validation uses, so a field rejected
+     by the server reads exactly as it would have if the form had caught it. */
+  var SERVER_FIELDS = {
+    property_type: { step: 1, on: "property_type", say: function () { return T.typeRequired; } },
+    area_sqft:     { step: 1, on: "area_sqft",     say: rangeSay },
+    bedrooms:      { step: 1, on: "bedrooms",      say: rangeSay },
+    bathrooms:     { step: 1, on: "bathrooms",     say: rangeSay },
+    restrooms:     { step: 1, on: "restrooms",     say: rangeSay },
+    floors:        { step: 1, on: "floors",        say: rangeSay },
+    desired_start: { step: 2, on: "desired_start", say: function () { return T.datePast; } },
+    access_notes:  { step: 2, on: "access_notes",  say: function () { return T.tooLong; } },
+    full_name:     { step: 3, on: "full_name",     say: function () { return T.nameRequired; } },
+    email:         { step: 3, on: "contact",       say: function () { return T.emailInvalid; } },
+    phone:         { step: 3, on: "contact",       say: function () { return T.contactRequired; } },
+    company:       { step: 3, on: "company",       say: function () { return T.tooLong; } },
+    consent_given: { step: 3, on: "consent_given", say: function () { return T.consentRequiredShort; } }
+  };
+
+  function rangeSay(field) {
+    var bounds = limits(form.elements[field]);
+    if (bounds.min === null && bounds.max === null) return T.tooLong;
+    return field === "area_sqft" ? T.areaRange(bounds.min, bounds.max)
+                                 : T.range(bounds.min, bounds.max);
+  }
+
+  /* The visible name of a field, so even a rejection with no entry above can be
+     described to the visitor instead of hidden behind a generic failure. */
+  function fieldLabel(field) {
+    var el = form.elements[field];
+    var id = el && (el.id || (el.length && el[0] && el[0].id));
+    var label = id ? form.querySelector('label[for="' + id + '"]') : null;
+    if (!label) {
+      var group = el && el.closest ? el.closest("fieldset") : null;
+      label = group ? group.querySelector("legend") : null;
+    }
+    return label ? label.textContent.trim().replace(/\s*\*$/, "") : field;
+  }
+
+  /* FastAPI reports either {detail: [{loc: [...], msg}]} for a schema rejection or
+     {detail: "some sentence"} for one we raise ourselves. Both arrive here. */
   function applyServerErrors(body) {
     var detail = body && body.detail;
-    if (!Array.isArray(detail)) return false;
-    var handled = false;
+
+    if (typeof detail === "string") {
+      /* The only one of these the visitor can act on. Matched on the field name
+         rather than the sentence so rewording the message cannot break this. */
+      if (detail.indexOf("consent") !== -1) {
+        fieldError("consent_given", T.consentRequiredShort);
+        errorBox.textContent = T.fixFields;
+        errorBox.hidden = false;
+        showStep(3);
+        focusFirstError();
+        return true;
+      }
+      return false;
+    }
+    if (!Array.isArray(detail) || !detail.length) return false;
+
+    var shown = 0;
+    var unnamed = [];
+    var step = null;
+
     detail.forEach(function (item) {
       var loc = item && item.loc;
       if (!Array.isArray(loc)) return;
-      var field = loc[loc.length - 1];
-      if (field === "email") { fieldError("contact", T.emailInvalid); handled = true; }
-      else if (field === "full_name") { fieldError("full_name", T.nameRequired); handled = true; }
-      else if (field === "phone") { fieldError("contact", T.contactRequired); handled = true; }
+      /* ["body", "property", "restrooms"] -> restrooms. Numeric tail elements are
+         list indexes (services[2]), so walk back past them. */
+      var field = null;
+      for (var i = loc.length - 1; i >= 0; i--) {
+        if (typeof loc[i] === "string" && loc[i] !== "body") { field = loc[i]; break; }
+      }
+      if (!field) return;
+
+      var known = SERVER_FIELDS[field];
+      if (known && fieldError(known.on, known.say(field))) {
+        shown++;
+        if (step === null || known.step < step) step = known.step;
+        return;
+      }
+      unnamed.push(fieldLabel(field));
     });
-    return handled;
+
+    if (shown) {
+      errorBox.textContent = T.fixFields;
+      errorBox.hidden = false;
+      if (step !== null) showStep(step);
+      focusFirstError();
+      return true;
+    }
+    if (unnamed.length) {
+      /* Nothing could be marked on a field, but the visitor still gets told which
+         answer it was -- never the phone number. */
+      errorBox.textContent = T.rejected(unnamed.join(", "));
+      errorBox.hidden = false;
+      scrollToTop();
+      return true;
+    }
+    return false;
   }
 
   /* ---------- start ---------- */

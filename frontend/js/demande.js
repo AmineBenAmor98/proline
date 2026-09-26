@@ -65,7 +65,10 @@
   /* ---------- rendering ---------- */
 
   function renderHead(d) {
-    var where = [d.property_type_label || A.PROPERTY_LABELS[d.property_type] || d.property_type,
+    /* The API sends the raw `property_type`; the label table is client-side.
+       (There is no `property_type_label` field -- an earlier version reached for
+       one and got away with it only because the fallback covered for it.) */
+    var where = [A.PROPERTY_LABELS[d.property_type] || d.property_type,
                  d.borough || d.city].filter(Boolean).join(", ");
     el("d-title").textContent = d.full_name + (where ? " — " + where : "");
     el("d-meta").textContent = [
@@ -142,12 +145,16 @@
     }).join(", "));
     fact(list, "Fréquence", A.FREQUENCY_LABELS[d.frequency] || d.frequency);
     fact(list, "Début souhaité", d.desired_start ? A.day(d.desired_start) : "");
+    /* `label` on a RequestedItem is already the whole phrase the visitor was
+       quoted -- "Vitres intérieures × 10 par fenêtre", "État : Encombré" -- so
+       it is printed as-is rather than taken apart into a key and a value. The
+       inbox chips render exactly the same string. */
     fact(list, "Extras", (d.extras || []).map(function (x) {
       return x.label || x.code;
     }).join(", "));
-    (d.modifiers || []).forEach(function (m) {
-      fact(list, m.label || m.code, m.option_label || m.value);
-    });
+    fact(list, "Précisions", (d.modifiers || []).map(function (m) {
+      return m.label || m.code;
+    }).join(", "));
     fact(list, "Accès de nuit", d.night_access ? "Oui" : "Non");
     fact(list, "Carte tarifaire", d.rate_card_version);
 
@@ -171,9 +178,19 @@
       return;
     }
 
+    /* The stored breakdown uses `label_fr` and `amount_cents`. Guessing `label`
+       and `cents` here is what printed three rows of raw codes against em
+       dashes -- moneyExact(undefined) returns "—", so it looked like a styling
+       problem rather than the wrong field name. The quantity and unit are on
+       the line too, and they are the difference between "24 $" and an
+       explained "24 $". */
     lines.forEach(function (item) {
-      host.appendChild(line(item.label || item.code, item.cents,
-                            item.cents < 0 ? "credit" : ""));
+      var label = item.label_fr || item.code;
+      if (item.quantity) {
+        label += " × " + item.quantity + (item.unit_fr ? " " + item.unit_fr : "");
+      }
+      host.appendChild(line(label, item.amount_cents,
+                            item.amount_cents < 0 ? "credit" : ""));
     });
 
     var total = document.createElement("div");
@@ -236,15 +253,24 @@
     fact(list, "Code postal", d.postal_code);
   }
 
+  /* Only when there is attribution worth reading.
+     `landing_path` is recorded on every single request, so counting it as
+     content meant this card appeared on every direct lead saying nothing but
+     "/soumission" -- a whole card telling you the page they were already on.
+     The card now belongs to paid traffic, where knowing which campaign produced
+     a lead is the point, and is simply absent otherwise. */
   function renderSource(d) {
     var list = el("d-source");
     list.innerHTML = "";
-    var source = [d.utm_source, d.utm_medium].filter(Boolean).join(" / ");
-    fact(list, "Source", source);
+    if (!d.utm_source && !d.utm_campaign && !d.gclid) {
+      el("source-card").hidden = true;
+      return;
+    }
+    fact(list, "Source", [d.utm_source, d.utm_medium].filter(Boolean).join(" / "));
     fact(list, "Campagne", d.utm_campaign);
     fact(list, "Google Ads", d.gclid ? "oui" : "");
     fact(list, "Page d'arrivée", d.landing_path);
-    el("source-card").hidden = list.children.length === 0;
+    el("source-card").hidden = false;
   }
 
   function renderAction(d) {

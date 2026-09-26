@@ -166,11 +166,15 @@
               <div class="field-group">
                 <div class="field">
                   <label for="restrooms">Number of restrooms</label>
-                  <input type="number" id="restrooms" name="restrooms" min="0" max="200" inputmode="numeric" placeholder="3">
+                  <input type="number" id="restrooms" name="restrooms" min="0" max="200" inputmode="numeric"
+                         placeholder="3" aria-describedby="err-restrooms">
+                  <p class="field-error" id="err-restrooms" role="alert" hidden></p>
                 </div>
                 <div class="field">
                   <label for="floors">Number of floors</label>
-                  <input type="number" id="floors" name="floors" min="1" max="100" inputmode="numeric" placeholder="2">
+                  <input type="number" id="floors" name="floors" min="1" max="100" inputmode="numeric"
+                         placeholder="2" aria-describedby="err-floors">
+                  <p class="field-error" id="err-floors" role="alert" hidden></p>
                 </div>
               </div>
               <label class="checkbox-row"><input type="checkbox" name="night_access"> Evening or night visits</label>
@@ -226,7 +230,8 @@
 
             <div class="field">
               <label for="access_notes">Access and constraints</label>
-              <textarea id="access_notes" name="access_notes" placeholder="Hours, parking, priority areas…"></textarea>
+              <textarea id="access_notes" name="access_notes" placeholder="Hours, parking, priority areas…" aria-describedby="err-access_notes"></textarea>
+              <p class="field-error" id="err-access_notes" role="alert" hidden></p>
             </div>
 
             <div class="wizard-actions">
@@ -246,7 +251,9 @@
               </div>
               <div class="field">
                 <label for="company">Company or condo board</label>
-                <input type="text" id="company" name="company" autocomplete="organization">
+                <input type="text" id="company" name="company" autocomplete="organization"
+                       aria-describedby="err-company">
+                <p class="field-error" id="err-company" role="alert" hidden></p>
               </div>
               <div class="field">
                 <label for="email">Email</label>
