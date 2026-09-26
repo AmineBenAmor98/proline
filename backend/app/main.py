@@ -37,13 +37,32 @@ app = FastAPI(
 
 @app.middleware("http")
 async def cache_headers(request: Request, call_next):
-    """In local dev an edited stylesheet must win over the browser cache; in
-    production static assets are cached for an hour."""
+    """What browsers may keep, and for how long.
+
+    CODE AND MARKUP MUST NEVER DISAGREE. This used to give /js/ and /css/
+    `max-age=3600`, and that hour was long enough to break a deploy: the HTML was
+    `no-cache` and updated immediately, the JavaScript did not, so for up to an
+    hour after every deploy a browser ran new markup against old code. It cost a
+    real debugging session -- an admin page showing a renamed column header and
+    the previous version's buttons, which looks like a deploy that half-worked
+    and is nothing of the sort.
+
+    So scripts and styles are `no-cache`, which does NOT mean "do not cache": the
+    browser still stores them and still sends If-None-Match, and an unchanged
+    file comes back as a 304 with no body. The cost is one conditional request
+    per asset per page load. The benefit is that what a visitor runs always
+    matches what they were served, which is worth far more than those requests.
+
+    Images keep a real cache. They are the bytes worth saving, they are not
+    versioned against anything, and a stale one is cosmetic rather than broken.
+    """
     response = await call_next(request)
     path = request.url.path
-    if path.startswith(("/css/", "/js/", "/img/")):
+    if path.startswith(("/css/", "/js/")):
+        response.headers["Cache-Control"] = "no-cache"
+    elif path.startswith("/img/"):
         response.headers["Cache-Control"] = (
-            "no-cache" if settings.environment == "local" else "public, max-age=3600"
+            "no-cache" if settings.environment == "local" else "public, max-age=604800"
         )
     elif path.endswith(".html") or response.headers.get("content-type", "").startswith("text/html"):
         response.headers["Cache-Control"] = "no-cache"

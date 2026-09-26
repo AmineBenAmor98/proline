@@ -12,7 +12,19 @@
 (function () {
   "use strict";
 
-  var A = window.A;
+  /* `ProlineAdmin` is the global admin-common.js actually exports; `A` is just
+     the short name every screen aliases it to. Getting this wrong cost a blank
+     page: the whole file is one IIFE, so `A.boot` threw at the bottom, nothing
+     ran, and #panel stayed hidden with no login screen and no visible error.
+     Hence the guard below -- a missing helper should say so, not show cream. */
+  var A = window.ProlineAdmin;
+  if (!A) {
+    document.documentElement.innerHTML =
+      '<pre style="padding:24px;font:14px/1.5 monospace">' +
+      "admin-common.js n'a pas été chargé — la page ne peut pas démarrer." +
+      "</pre>";
+    return;
+  }
   var detail = null;
   var objectUrls = [];
 
