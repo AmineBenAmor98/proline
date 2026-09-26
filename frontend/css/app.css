@@ -543,6 +543,34 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 }
 .footer-bottom a { color: var(--muted); display: inline-block; padding-block: 6px; }
 
+/* ---------- legal pages ---------- */
+
+/* Nobody reads a privacy policy for pleasure, so the job here is to make the one
+   paragraph somebody came for findable: a reading measure narrow enough to scan,
+   headings that carry their own weight, and generous space between sections so
+   the eye can jump rather than wade. */
+/* Centred, not left-aligned: at 1440px a 68ch column pinned to the left edge
+   leaves two thirds of the screen empty and the page reads as broken rather than
+   as a document. */
+.legal { max-width: 68ch; margin-inline: auto; }
+.legal h2 {
+  font-size: 1.12rem; margin: 38px 0 10px;
+  padding-top: 20px; border-top: 1px solid var(--line);
+}
+.legal .section-head + h2 { margin-top: 0; }
+.legal p { color: var(--body); line-height: 1.7; margin: 0 0 12px; }
+.legal ul { margin: 0 0 12px; padding-left: 0; list-style: none; }
+.legal li {
+  position: relative; padding-left: 20px; margin-bottom: 8px;
+  color: var(--body); line-height: 1.65;
+}
+.legal li::before {
+  content: ""; position: absolute; left: 2px; top: 0.62em;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--gold);
+}
+.legal strong { color: var(--ink); }
+.legal a:not(.btn) { color: var(--navy); text-decoration: underline; text-underline-offset: 3px; }
+
 /* ---------- mobile call bar ---------- */
 
 .callbar {
@@ -1153,7 +1181,11 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 @media (max-width: 1040px) { .detail-cols { grid-template-columns: minmax(0, 1fr); } }
 .detail-main, .detail-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
 
-.card {
+/* SCOPED TO .admin-body ON PURPOSE. This was a bare `.card`, several hundred
+   lines below the public site's `.card`, so it won a specificity tie by source
+   order and quietly re-padded every card on the marketing pages to the admin's
+   tighter 20px 22px. The admin wants its own padding; the site is not the admin. */
+.admin-body .card {
   background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
   padding: 20px 22px; box-shadow: var(--shadow-sm);
 }
@@ -1193,13 +1225,24 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 
 /* The decision box: the number and the one button that matters, at the top of
    the column rather than trailing three cards of reference material. */
-.card-action { background: var(--navy-deep); border-color: var(--navy-deep); }
+/* Scoped to match `.admin-body .card` above, NOT because it needs the scope but
+   because it needs the specificity: as a bare `.card-action` it lost the tie to
+   `.admin-body .card`'s white background and the decision box rendered as pale
+   grey text on white -- unreadable, and the one card on the page that has to be
+   read. Any rule here that overrides a `.card` property has to carry the same
+   two classes. */
+.admin-body .card-action { background: var(--navy-deep); border-color: var(--navy-deep); }
 .card-action label, .card-action .note { color: var(--on-navy-soft); }
 .card-action .field { margin-bottom: 8px; }
 .card-action input[type="text"] {
   font-family: var(--font-display); font-size: 1.32rem; font-weight: 700; height: 56px;
 }
 .card-action .btn { width: 100%; margin-top: 12px; }
+/* "par visite · aux 2 semaines" beside the field label. Every price here is per
+   visit; without the words it is read as whatever the reader assumes, and the
+   reader is about to email it to a customer. */
+.unit-hint { font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.85; }
+.breakdown-period { margin: 10px 0 0; text-align: right; }
 .action-foot {
   display: flex; align-items: center; gap: 10px; margin-top: 12px;
   font-size: 0.85rem; color: var(--on-navy-soft);
@@ -1236,6 +1279,13 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 .breakdown-dots { flex-grow: 1; border-bottom: 1px dotted var(--line-strong); }
 .breakdown-amount { font-variant-numeric: tabular-nums; color: var(--ink); }
 .breakdown-amount.is-credit { color: var(--ok); }
+/* The subtotal closes the line items and opens the adjustments, so it needs a
+   rule above it and a little weight -- otherwise it reads as one more line item
+   and the card looks like it double-counts. */
+.breakdown-amount.is-sub { font-weight: 600; }
+.breakdown-row:has(.is-sub) {
+  margin-top: 6px; padding-top: 10px; border-top: 1px solid var(--line-soft); font-weight: 600;
+}
 .breakdown-total {
   margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line);
   font-family: var(--font-display); font-weight: 700; color: var(--navy-deep);

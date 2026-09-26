@@ -1,13 +1,20 @@
 """The site is served by the same app as the API. These tests fail loudly if a
 page stops being reachable, which is the failure that quietly wastes ad budget."""
 
+import json
+import pathlib
+import re
+
 import pytest
 
 PAGES = [
     "/", "/soumission", "/commercial",
     "/en", "/en/soumission", "/en/commercial",
+    "/confidentialite", "/conditions", "/en/privacy", "/en/terms",
     "/admin", "/admin/tarifs", "/admin/demande",
 ]
+
+FRONTEND = pathlib.Path(__file__).resolve().parent.parent.parent / "frontend"
 
 
 @pytest.mark.parametrize("path", PAGES)
@@ -21,7 +28,7 @@ async def test_static_assets_are_served(client):
     for path in [
         "/css/app.css", "/js/quote.js",
         "/js/admin-common.js", "/js/admin.js", "/js/rates.js",
-        "/js/photos.js", "/js/demande.js",
+        "/js/photos.js", "/js/demande.js", "/js/home.js",
     ]:
         response = await client.get(path)
         assert response.status_code == 200, path
@@ -96,3 +103,103 @@ def test_the_english_tree_is_in_sync_and_carries_no_french():
 
     dead = [src for src, _ in build_en.TEXT if src not in build_en.USED]
     assert not dead, f"map entries matching nothing: {dead}"
+
+
+# --------------------------------------------------------------------------
+# Nothing on a public page may be a placeholder or a dead link
+# --------------------------------------------------------------------------
+
+PUBLIC = ["/", "/commercial", "/soumission",
+          "/en", "/en/commercial", "/en/soumission",
+          "/confidentialite", "/conditions", "/en/privacy", "/en/terms"]
+
+# `[PRIX] $`, `[NOMBRE] avis Google`, `[Confidentialité]`, a mailto whose text was
+# the address wrapped in brackets -- all of them reached the live site. A human
+# reading the page is supposed to catch this and did not, four times over.
+PLACEHOLDER = re.compile(r"\[[A-Za-z\u00c0-\u00ff@][^\]\n]{2,}\]")
+
+
+@pytest.mark.parametrize("path", PUBLIC)
+async def test_no_placeholder_survives(client, path):
+    page = (await client.get(path)).text
+    # The JSON-LD block is legitimately full of brackets.
+    page = re.sub(r"<script[^>]*application/ld\+json.*?</script>", "", page, flags=re.S)
+    found = PLACEHOLDER.findall(page)
+    assert not found, f"{path} still shows {found}"
+
+
+@pytest.mark.parametrize("path", PUBLIC)
+async def test_every_internal_link_resolves(client, path):
+    """A link to a page that does not exist, or to an anchor no element carries.
+
+    The footer pointed "Décapage et cirage" at `/#services` and the English side
+    pointed at a French anchor id. Both render perfectly and both go nowhere near
+    what they name.
+    """
+    page = (await client.get(path)).text
+    broken = []
+    for href in set(re.findall(r'href="([^"]+)"', page)):
+        if href.startswith(("http", "mailto:", "tel:", "#")) and not href.startswith("#"):
+            continue
+        if href.startswith("#"):
+            target, url = href[1:], path
+        else:
+            url, _, target = href.partition("#")
+            url = url or path
+        if url.startswith(("http", "mailto:", "tel:")):
+            continue
+        response = await client.get(url)
+        if response.status_code != 200:
+            broken.append(f"{href} -> {response.status_code}")
+            continue
+        if target and f'id="{target}"' not in response.text:
+            broken.append(f"{href} -> no element with id={target}")
+    assert not broken, f"{path}: {broken}"
+
+
+async def test_the_home_page_example_is_a_payload_the_api_accepts(client):
+    """The preview panel prices a real home through /api/quotes/price.
+
+    A typo in that payload would not break the page -- the fetch would simply fail
+    and the panel would keep its no-number wording forever, which looks exactly
+    like "no rate card yet". This is the only thing that would notice.
+    """
+    script = (FRONTEND / "js" / "home.js").read_text()
+    body = re.search(r"var EXAMPLE = (\{.*?\n  \});", script, re.S)
+    assert body, "EXAMPLE went missing from home.js"
+    payload = json.loads(re.sub(r"(\w+):", r'"\1":', body.group(1)).replace("'", '"'))
+
+    response = await client.post("/api/quotes/price", json=payload)
+    # 200 with a card that prices it, 409 with one that does not. 403 would mean
+    # the example stopped being residential and 422 that it stopped being valid --
+    # both are permanent silent failures of the panel.
+    assert response.status_code in (200, 409), response.text
+
+
+async def test_the_preview_chips_and_the_priced_example_agree(client):
+    """A panel captioned "1 100 pi2" that prices 1,400 is worse than no panel."""
+    script = (FRONTEND / "js" / "home.js").read_text()
+    assert '"area_sqft": 1100' in script or "area_sqft: 1100" in script
+    for page, chip in [("/", "1\u202f100 pi²"), ("/en", "1,100 sq ft")]:
+        text = (await client.get(page)).text
+        assert chip in text or chip.replace("\u202f", " ") in text, (page, chip)
+
+
+def test_the_admin_stylesheet_does_not_reach_into_the_public_site():
+    """`.card` was defined twice in one stylesheet -- once for the marketing pages
+    and again, hundreds of lines later, for the admin. The admin copy won the
+    specificity tie by source order and quietly re-padded every card on the public
+    site.
+
+    Scoping it fixed that and broke something else: `.card-action`, a bare single
+    class, then lost the tie to `.admin-body .card` and the decision box rendered
+    as pale text on white. Both failures are invisible to every other test here,
+    so the rule is checked directly: the admin's card rules are scoped, and
+    anything overriding them carries the same two classes.
+    """
+    css = (FRONTEND / "css" / "app.css").read_text()
+    assert "\n.admin-body .card {" in css, "the admin card rule must stay scoped"
+    assert "\n.card {" in css, "the public site keeps its own unscoped .card"
+    assert "\n.card-action {" not in css, (
+        ".card-action must be .admin-body .card-action, or .admin-body .card outranks it"
+    )

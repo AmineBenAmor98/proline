@@ -333,6 +333,85 @@ function patches(win) {
       win.document.getElementById("d-property").textContent);
   }
 
+  // THE BREAKDOWN HAS TO ADD UP. It did not: the card printed 175,74 $ + 15,00 $
+  // above a total of 162,13 $, because the recurring discount between them was
+  // never rendered. Three numbers on one card that do not sum, on the screen
+  // where a price is decided and then emailed to a customer.
+  {
+    const win = await boot({
+      frequency: "biweekly",
+      computed_total_cents: 16213,
+      computed_breakdown: {
+        lines: [
+          { code: "labour", label_fr: "Main-d'\u0153uvre estim\u00e9e", amount_cents: 17574 },
+          { code: "travel", label_fr: "D\u00e9placement", amount_cents: 1500 }
+        ],
+        subtotal_cents: 19074,
+        discount_cents: 2861,
+        minimum_adjustment_cents: 0,
+        total_cents: 16213
+      }
+    });
+    const rows = [...win.document.querySelectorAll("#d-breakdown .breakdown-row")];
+    const read = rows.map((r) => ({
+      label: r.children[0].textContent,
+      cents: Math.round(parseFloat(
+        r.children[2].textContent.replace(/[^\d,.-]/g, "").replace(",", ".")) * 100)
+    }));
+    const total = read[read.length - 1];
+    const before = read.slice(0, -1);
+
+    check("breakdown: the discount is shown at all",
+      before.some((r) => /[Rr]abais/.test(r.label)), read.map((r) => r.label).join(" | "));
+
+    // Everything after the subtotal row is what adjusts it; the rows before it
+    // are the line items. Either way the last adjustment chain must reach the total.
+    const subIndex = before.findIndex((r) => /Sous-total/.test(r.label));
+    check("breakdown: a subtotal row separates the lines from the adjustments",
+      subIndex > 0, String(subIndex));
+    if (subIndex > 0) {
+      const lines = before.slice(0, subIndex).reduce((a, r) => a + r.cents, 0);
+      const adjustments = before.slice(subIndex + 1).reduce((a, r) => a + r.cents, 0);
+      check("breakdown: the line items sum to the subtotal",
+        lines === before[subIndex].cents, lines + " vs " + before[subIndex].cents);
+      check("breakdown: subtotal plus adjustments equals the total",
+        before[subIndex].cents + adjustments === total.cents,
+        before[subIndex].cents + " + " + adjustments + " != " + total.cents);
+    }
+
+    check("breakdown: the total says what period it covers",
+      /par visite/.test(win.document.getElementById("d-breakdown").textContent),
+      win.document.getElementById("d-breakdown").textContent.slice(-60));
+    check("the send hint says what period it covers",
+      /par visite/.test(win.document.getElementById("d-computed-hint").textContent),
+      win.document.getElementById("d-computed-hint").textContent);
+    check("the price field label says it too",
+      /par visite/.test(win.document.getElementById("offer-price-unit").textContent),
+      win.document.getElementById("offer-price-unit").textContent);
+  }
+
+  // A one-time quote with no discount: the lines already reach the total, so no
+  // subtotal row, and the period reads "pour la visite" rather than "par visite".
+  {
+    const win = await boot({
+      frequency: "one_time",
+      computed_total_cents: 19074,
+      computed_breakdown: {
+        lines: [
+          { code: "labour", label_fr: "Main-d'\u0153uvre estim\u00e9e", amount_cents: 17574 },
+          { code: "travel", label_fr: "D\u00e9placement", amount_cents: 1500 }
+        ],
+        subtotal_cents: 19074, discount_cents: 0, minimum_adjustment_cents: 0,
+        total_cents: 19074
+      }
+    });
+    const text = win.document.getElementById("d-breakdown").textContent;
+    check("one-time: no subtotal row when nothing adjusts it", !/Sous-total/.test(text));
+    check("one-time: no phantom discount row", !/[Rr]abais/.test(text));
+    check("one-time: the period reads for the visit", /pour la visite/.test(text),
+      text.slice(-60));
+  }
+
   // Every label must sit with its own value. This is the shape the bug had: the
   // <dt> and <dd> were separate grid items, so a three-column track printed
   // "TYPE | Commerce | SUPERFICIE" on one row and "2112 pi2 | TOILETTES | 88" on

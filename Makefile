@@ -36,10 +36,12 @@ test: ## Full suite inside the container, against the compose database
 # The quote form in a real DOM. The Python suite is green on bugs this catches:
 # a 422 the form showed as "sending failed, call us", a photo block that never
 # appeared. Runs on the host, needs nothing running.
-test-form: ## The quote form, both languages, in jsdom
+test-form: ## The public pages and the admin detail page, in jsdom
 	npm i --no-save --silent jsdom
 	node frontend/test/check_form.js
 	node frontend/test/check_form.js en/soumission.html
+	node frontend/test/check_home.js
+	node frontend/test/check_admin_edit.js
 
 
 lint: ## Ruff, configured in backend/pyproject.toml

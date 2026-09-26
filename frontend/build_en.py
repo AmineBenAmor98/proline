@@ -21,7 +21,11 @@ LINKS = [
     ('href="/soumission?audience=residential"', 'href="/en/soumission?audience=residential"'),
     ('href="/soumission?audience=commercial"', 'href="/en/soumission?audience=commercial"'),
     ('href="/soumission"', 'href="/en/soumission"'),
-    ('href="/commercial#apres-travaux"', 'href="/en/commercial#apres-travaux"'),
+    ('href="/commercial#apres-travaux"', 'href="/en/commercial#after-construction"'),
+    # The link and the id move together, same lesson as #residentiel below: a
+    # French id on an English page is a URL nobody can read and an anchor that
+    # only works while both halves happen to still be misspelled the same way.
+    ('id="apres-travaux"', 'id="after-construction"'),
     ('href="/commercial"', 'href="/en/commercial"'),
     # The link and the id have to move together: rewriting only the href left
     # "Residential" on the English pages pointing at a section that is still
@@ -29,6 +33,9 @@ LINKS = [
     ('href="/#residentiel"', 'href="/en/#residential"'),
     ('id="residentiel"', 'id="residential"'),
     ('href="/#services"', 'href="/en/#services"'),
+    ('href="/#decapage"', 'href="/en/#decapage"'),
+    ('href="/confidentialite"', 'href="/en/privacy"'),
+    ('href="/conditions"', 'href="/en/terms"'),
     ('href="/"', 'href="/en"'),
 ]
 
@@ -109,14 +116,14 @@ TEXT = [
     ("Assurée et cautionnée", "Insured and bonded"),
     ("Produits et équipement fournis", "Products and equipment supplied"),
     ("Satisfaction garantie ou reprise", "Satisfaction guaranteed or we come back"),
-    ("[NOMBRE] avis Google", "[NUMBER] Google reviews"),
+    ("Montréal, Laval et la Rive-Sud", "Montreal, Laval and the South Shore"),
     ("Un seul fournisseur, du condo à l'immeuble de bureaux.", "One provider, from a condo to an office building."),
     ("Ménage résidentiel", "Home cleaning"),
     ("Récurrent ou ponctuel, avec liste de tâches convenue par pièce.", "Recurring or one-time, with an agreed task list per room."),
-    ("Prix en ligne", "Online price"),
+    ("Prix en ligne →", "Online price →"),
     ("Bureaux et commerces", "Offices and retail"),
     ("Passages du soir ou de nuit, selon vos heures d'accès.", "Evening or night visits, around your access hours."),
-    ("Soumission 24 h", "Quote in 24h"),
+    ("Soumission 24 h →", "Quote in 24h →"),
     ("Immeubles et copropriétés", "Buildings and condos"),
     ("Aires communes, corridors, escaliers et entrées.", "Common areas, hallways, stairwells and entrances."),
     ("Fin de bail", "End of lease"),
@@ -151,11 +158,10 @@ TEXT = [
      "Offices, retail, buildings, industrial and post-construction. A written quote within 24 hours."),
     ("Nettoyage commercial, industriel, résidentiel et post-construction.",
      "Commercial, industrial, residential and post-construction cleaning."),
-    ("[SUP] pi²", "[AREA] sq ft"),
-    ("[PRIX] $", "[PRICE] $"),
+    ("1 100 pi²", "1,100 sq ft"),
     ("par visite · aux deux semaines", "per visit · every two weeks"),
-    ("Estimation ferme pour un logement standard. Un cas particulier est confirmé avant la première visite.",
-     "A firm price for a standard home. Anything unusual is confirmed before the first visit."),
+    ("Quatre questions et votre prix s'affiche ici, avant le moindre appel.",
+     "Four questions and your price appears here, before a single phone call."),
     ("Comment ça marche", "How it works"),
     ("Trois étapes, aucune zone grise.", "Three steps, no grey areas."),
     ("Vous décrivez les lieux", "You describe the space"),
@@ -341,10 +347,13 @@ TEXT = [
      "Commercial, industrial, residential and post-construction cleaning, including floor stripping and waxing. Greater Montreal."),
     ("Suivez-nous sur Facebook", "Follow us on Facebook"),
     (">Services<", ">Services<"),
-    (">Secteurs<", ">Areas<"),
+    ("Secteurs desservis", "Areas served"),
+    ("Montréal, Laval, Longueuil, la Rive-Nord et la Rive-Sud.",
+     "Montreal, Laval, Longueuil, the North Shore and the South Shore."),
     (">Nous joindre<", ">Contact<"),
     ("Lun–ven, 8 h–18 h", "Mon–Fri, 8am–6pm"),
-    ("[Confidentialité] · [Conditions]", "[Privacy] · [Terms]"),
+    (">Confidentialité<", ">Privacy<"),
+    (">Conditions<", ">Terms<"),
     ("Appeler", "Call"),
 ]
 

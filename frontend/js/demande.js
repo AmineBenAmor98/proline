@@ -209,6 +209,31 @@
                             item.amount_cents < 0 ? "credit" : ""));
     });
 
+    /* THE BREAKDOWN HAS TO CLOSE. It did not: this rendered the line items and
+       then the total, and skipped the two rows in between -- the recurring
+       discount and the minimum-visit adjustment. On any recurring quote the
+       result was 175,74 $ + 15,00 $ under a total of 162,13 $, three numbers on
+       one card that do not add up, on the screen where a price is decided.
+
+       The quote form has shown these rows since the day it was written. This
+       screen simply never learned about them. Sous-total appears only when
+       something comes after it; on a one-time quote with no discount the lines
+       already add to the total and a subtotal row would be noise. */
+    var discount = breakdown.discount_cents || 0;
+    var minimum = breakdown.minimum_adjustment_cents || 0;
+
+    if (discount || minimum) {
+      var subtotal = breakdown.subtotal_cents;
+      if (subtotal === null || subtotal === undefined) {
+        subtotal = lines.reduce(function (sum, item) {
+          return sum + (item.amount_cents || 0);
+        }, 0);
+      }
+      host.appendChild(line("Sous-total", subtotal, "sub"));
+      if (discount) host.appendChild(line("Rabais récurrent", -discount, "credit"));
+      if (minimum) host.appendChild(line("Ajustement visite minimum", minimum, ""));
+    }
+
     var total = document.createElement("div");
     total.className = "breakdown-row breakdown-total";
     var label = document.createElement("span");
@@ -222,6 +247,13 @@
     total.appendChild(spacer);
     total.appendChild(amount);
     host.appendChild(total);
+
+    /* Same reason as the hint beside the send button: the number is per visit,
+       and a total with no period on it is read as whatever the reader assumes. */
+    var period = document.createElement("p");
+    period.className = "note breakdown-period";
+    period.textContent = perVisit(d.frequency);
+    host.appendChild(period);
   }
 
   function renderContact(d) {
@@ -291,13 +323,28 @@
     el("source-card").hidden = false;
   }
 
+  /* WHAT PERIOD THE NUMBER COVERS, in words, everywhere the number appears.
+     Every price in this system is per visit -- never per month, never for the
+     contract -- and nothing on this screen said so. "162,13 $" beside a monthly
+     job reads as the monthly bill to anyone who has not read the pricing code,
+     and the person reading it is about to email it to a customer. */
+  function perVisit(frequency) {
+    if (frequency === "one_time") return "pour la visite";
+    var label = A.FREQUENCY_LABELS[frequency];
+    return label ? "par visite · " + label.toLowerCase() : "par visite";
+  }
+
   function renderAction(d) {
     var price = el("offer-price");
     price.value = A.moneyExact(
       d.quoted_total_cents != null ? d.quoted_total_cents : (d.computed_total_cents || 0)
     );
+    var period = perVisit(d.frequency);
+    var unit = el("offer-price-unit");
+    if (unit) unit.textContent = period;
     el("d-computed-hint").textContent = d.computed_total_cents != null
-      ? "Calculé : " + A.moneyExact(d.computed_total_cents) + " — modifiable avant l'envoi"
+      ? "Calculé : " + A.moneyExact(d.computed_total_cents) + " " + period +
+        " — modifiable avant l'envoi"
       : "Aucun prix calculé — entrez le vôtre.";
 
     var sent = (d.offers || []).filter(function (o) { return o.status === "sent"; });
