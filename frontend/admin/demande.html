@@ -67,13 +67,19 @@
             <div class="admin-photo-grid" id="d-photos"></div>
           </section>
 
-          <section class="card">
-            <div class="card-head"><h2>La demande</h2></div>
-            <dl class="factgrid" id="d-request"></dl>
-            <div id="d-notes-wrap" hidden>
-              <span class="field-label">Notes d'accès</span>
-              <p id="d-notes"></p>
+          <section class="card" id="request-card">
+            <div class="card-head">
+              <h2>La demande</h2>
+              <button type="button" class="linkbtn" data-edit="request">Modifier</button>
             </div>
+            <div data-view="request">
+              <dl class="factgrid" id="d-request"></dl>
+              <div id="d-notes-wrap" hidden>
+                <span class="field-label">Notes d'accès</span>
+                <p id="d-notes"></p>
+              </div>
+            </div>
+            <form class="editform" data-form="request" hidden></form>
           </section>
 
           <section class="card">
@@ -97,15 +103,27 @@
             </div>
           </section>
 
-          <section class="card">
-            <div class="card-head"><h2>Coordonnées</h2></div>
-            <div id="d-contact"></div>
-            <dl class="factgrid factgrid-2" id="d-contact-facts"></dl>
+          <section class="card" id="contact-card">
+            <div class="card-head">
+              <h2>Coordonnées</h2>
+              <button type="button" class="linkbtn" data-edit="contact">Modifier</button>
+            </div>
+            <div data-view="contact">
+              <div id="d-contact"></div>
+              <dl class="factgrid factgrid-2" id="d-contact-facts"></dl>
+            </div>
+            <form class="editform" data-form="contact" hidden></form>
           </section>
 
-          <section class="card">
-            <div class="card-head"><h2>La propriété</h2></div>
-            <dl class="factgrid factgrid-3" id="d-property"></dl>
+          <section class="card" id="property-card">
+            <div class="card-head">
+              <h2>La propriété</h2>
+              <button type="button" class="linkbtn" data-edit="property">Modifier</button>
+            </div>
+            <div data-view="property">
+              <dl class="factgrid factgrid-2" id="d-property"></dl>
+            </div>
+            <form class="editform" data-form="property" hidden></form>
           </section>
 
           <section class="card" id="source-card" hidden>

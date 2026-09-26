@@ -86,6 +86,13 @@ services:
     image: proline-app:latest
     restart: unless-stopped
     env_file: /srv/proline/.env
+    # It is the app's image but not the app: no server listens in here, so the
+    # image's own healthcheck (curl :8000/healthz) can only ever fail. Left on, this
+    # container sat at `(unhealthy)` forever in `docker ps` -- which is worse than
+    # useless, because it trains you to ignore that column on the containers where
+    # it means something.
+    healthcheck:
+      disable: true
     environment:
       ENVIRONMENT: production
       PHOTOS_DIR: /srv/photos

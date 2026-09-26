@@ -53,9 +53,28 @@ uvicorn app.main:app --reload
 | `/api/quotes` `POST` | Submit a request |
 | `/api/quotes/price` `POST` | Live residential price |
 | `/api/admin/requests` | List / patch, Bearer token |
+| `/admin/demande?id=…` | One request in full: photos, notes, the offer |
 | `/docs` | OpenAPI |
 
 ## Tests
+
+```bash
+cd backend
+pytest            # the API
+```
+
+```bash
+make test-form    # the pages themselves, in a real DOM
+```
+
+Two suites, and the second one is not optional. `pytest` covers the API
+thoroughly and is **green on every page-level bug this project has had**: a detail
+page that rendered nothing, a price breakdown printing raw codes, a rejected
+washroom count reported to the visitor as "sending failed, call us", a photo
+block that never appeared because an unrelated crash killed the line that mounted
+it. `make test-form` loads the real markup, runs the real scripts, and asserts on
+what ends up on screen. Add a case there whenever something reaches the browser
+that the API tests could not have caught.
 
 ```bash
 cd backend

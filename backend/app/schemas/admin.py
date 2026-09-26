@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.enums import Audience, Frequency, RequestStatus
 
@@ -120,6 +121,73 @@ class AdminRequestPatch(BaseModel):
     status: RequestStatus | None = None
     quoted_total_cents: int | None = None
     notes: str | None = None
+
+
+class AdminCustomerPatch(BaseModel):
+    """What Amine may correct after talking to the customer.
+
+    THE FORM IS A FIRST DRAFT. A visitor types "1200" when the place is 2100, gives
+    a phone number with a digit missing, or leaves the address out entirely and says
+    it on the phone. Until now all of that was frozen the moment they pressed send,
+    and the only way to fix a typo in an email address was a database client.
+
+    WHAT IS DELIBERATELY NOT HERE:
+      * audience and property_type -- they decide which half of the pricing grid
+        applies and are checked against each other on the way in. Changing a triplex
+        into a shop is not a correction, it is a different request.
+      * consent_given -- a record of what the customer agreed to. Ours to honour,
+        not to edit.
+      * the attribution fields -- captured once on arrival. A campaign you can
+        rewrite afterwards is a campaign report you cannot trust.
+      * computed_breakdown -- what the visitor was actually shown at submission.
+        Editing the area does not rewrite history; the price to send is its own
+        field and always was.
+
+    Every field is optional AND absence means "leave it alone", which is not the
+    same as null. The endpoint reads `model_fields_set`, so a payload of
+    {"phone": null} clears the phone and a payload without "phone" does not touch
+    it. Bounds match PropertyIn and ContactIn -- the same data, so the same limits.
+    """
+
+    full_name: Annotated[str, Field(min_length=2, max_length=160)] | None = None
+    company: Annotated[str, Field(max_length=160)] | None = None
+    email: EmailStr | None = None
+    phone: Annotated[str, Field(max_length=40)] | None = None
+    preferred_contact: Annotated[str, Field(pattern="^(email|phone)$")] | None = None
+
+    address_line: Annotated[str, Field(max_length=255)] | None = None
+    city: Annotated[str, Field(max_length=120)] | None = None
+    borough: Annotated[str, Field(max_length=120)] | None = None
+    postal_code: Annotated[str, Field(max_length=12)] | None = None
+
+    area_sqft: Annotated[int, Field(ge=100, le=1_000_000)] | None = None
+    bedrooms: Annotated[int, Field(ge=0, le=20)] | None = None
+    bathrooms: Annotated[int, Field(ge=0, le=20)] | None = None
+    floors: Annotated[int, Field(ge=1, le=100)] | None = None
+    restrooms: Annotated[int, Field(ge=0, le=200)] | None = None
+
+    desired_start: date | None = None
+    access_notes: Annotated[str, Field(max_length=2000)] | None = None
+
+    @field_validator(
+        "full_name", "company", "email", "phone", "preferred_contact",
+        "address_line", "city", "borough", "postal_code", "access_notes",
+        "area_sqft", "bedrooms", "bathrooms", "floors", "restrooms", "desired_start",
+        mode="before",
+    )
+    @classmethod
+    def blank_is_null(cls, value: object) -> object:
+        """An emptied input clears the field rather than failing validation.
+
+        A browser form has no way to send "absent" for a text box the operator just
+        emptied -- it sends "". Without this, clearing the company name is a 422 on
+        min_length, and clearing an email address is a 422 from EmailStr. Absence is
+        still expressed by leaving the key out of the JSON entirely, which is what
+        the frontend does for fields the open card does not show.
+        """
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value.strip() if isinstance(value, str) else value
 
 
 class OfferIn(BaseModel):

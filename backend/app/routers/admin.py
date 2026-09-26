@@ -14,6 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
+from app.core.logging import logger
 from app.core.security import (
     TOKEN_TTL_SECONDS,
     check_credentials,
@@ -24,6 +25,7 @@ from app.db.session import get_session
 from app.models import Lead, OfferEmail, Property, Quote, QuotePhoto, QuoteRequest
 from app.models.enums import PHOTO_ZONE_LABELS_FR, RequestStatus
 from app.schemas.admin import (
+    AdminCustomerPatch,
     AdminPhoto,
     AdminRequestDetail,
     AdminRequestList,
@@ -232,16 +234,16 @@ async def _request_with_people(session: AsyncSession, request_id: UUID):
     return found
 
 
-@router.get("/requests/{request_id}", response_model=AdminRequestDetail)
-async def request_detail(
-    request_id: UUID,
-    session: AsyncSession = Depends(get_session),
-) -> AdminRequestDetail:
+async def _detail(session: AsyncSession, request_id: UUID) -> AdminRequestDetail:
     """Everything known about one request, for the detail page.
 
     One call, not five. The page shows photos, contact, property, pricing and
     the offers already sent together, and five round-trips to paint one screen
     is five chances for a partly-rendered page.
+
+    A function rather than only a route, because the customer PATCH below answers
+    with the same shape: the page then re-renders itself from one response instead
+    of patching its own DOM from what it hopes was saved.
     """
     request, lead, prop = await _request_with_people(session, request_id)
 
@@ -317,6 +319,93 @@ async def request_detail(
             for offer in offers
         ],
     )
+
+
+@router.get("/requests/{request_id}", response_model=AdminRequestDetail)
+async def request_detail(
+    request_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> AdminRequestDetail:
+    return await _detail(session, request_id)
+
+
+# Which model each editable field lives on. The detail page shows contact, address
+# and property side by side as if they were one record; underneath they are three
+# tables, and a dict beats three if/elif ladders that drift apart.
+_CUSTOMER_FIELDS: dict[str, str] = {
+    "full_name": "lead",
+    "company": "lead",
+    "email": "lead",
+    "phone": "lead",
+    "preferred_contact": "lead",
+    "address_line": "property",
+    "city": "property",
+    "borough": "property",
+    "postal_code": "property",
+    "area_sqft": "property",
+    "bedrooms": "property",
+    "bathrooms": "property",
+    "floors": "property",
+    "restrooms": "property",
+    "desired_start": "request",
+    "access_notes": "request",
+}
+
+
+@router.patch("/requests/{request_id}/customer", response_model=AdminRequestDetail)
+async def update_customer(
+    request_id: UUID,
+    payload: AdminCustomerPatch,
+    session: AsyncSession = Depends(get_session),
+) -> AdminRequestDetail:
+    """Correct what the customer told us, after they told us something better.
+
+    Half of what arrives on a quote form is a first draft: an area guessed low, a
+    phone number with a digit missing, an address left blank and given on the call.
+    None of it was editable, so the only fix was a psql session.
+
+    ONLY THE KEYS THAT ARE PRESENT are written. `model_fields_set` is the whole
+    mechanism: {"phone": null} clears the phone, a payload without "phone" leaves
+    it alone. Sending the full record on every save would mean one card's form
+    silently blanking the fields belonging to another.
+
+    What cannot be edited here, and why, is in AdminCustomerPatch's docstring.
+    """
+    request, lead, prop = await _request_with_people(session, request_id)
+    targets = {"lead": lead, "property": prop, "request": request}
+
+    given = payload.model_dump(exclude_unset=True)
+    unknown = set(given) - set(_CUSTOMER_FIELDS)
+    if unknown:  # pragma: no cover - the schema cannot produce this
+        raise HTTPException(status_code=422, detail=f"not editable: {sorted(unknown)}")
+
+    # A REQUEST WITH NEITHER AN EMAIL NOR A PHONE CANNOT BE ANSWERED, which is why
+    # the public form refuses one. Checked against the merged result rather than the
+    # payload: a patch clearing only the email is fine if a phone number is on file,
+    # and the same patch is a dead end if it is not.
+    merged_email = given.get("email", lead.email) if "email" in given else lead.email
+    merged_phone = given.get("phone", lead.phone) if "phone" in given else lead.phone
+    if not merged_email and not merged_phone:
+        raise HTTPException(
+            status_code=422,
+            detail="Gardez au moins un courriel ou un téléphone : sans l'un des deux, "
+                   "la demande ne peut plus être répondue.",
+        )
+
+    changed: list[str] = []
+    for field, value in given.items():
+        target = targets[_CUSTOMER_FIELDS[field]]
+        if getattr(target, field) != value:
+            setattr(target, field, value)
+            changed.append(field)
+
+    if changed:
+        await session.commit()
+        # Field NAMES only. The values are a customer's address and telephone
+        # number, and logs are read by more people and kept longer than rows.
+        logger.info("admin.customer.updated", request_id=str(request_id), fields=changed)
+
+    return await _detail(session, request_id)
 
 
 @router.get("/photos/{photo_id}")

@@ -38,12 +38,20 @@
      field printed as "—" is noise; six of them hide the two that matter. */
   function fact(list, label, value) {
     if (value === null || value === undefined || value === "") return;
+    /* The pair goes in a wrapper, so the grid moves a fact rather than a <dt> and
+       a <dd> independently. Without it a three-column grid laid "TYPE | Commerce |
+       SUPERFICIE" on one row and "2112 pi² | TOILETTES | 88" on the next -- every
+       label against somebody else's value. (A <div> between <dl> and <dt>/<dd> is
+       valid HTML5 and keeps the list semantics intact.) */
+    var wrap = document.createElement("div");
+    wrap.className = "fact";
     var dt = document.createElement("dt");
     dt.textContent = label;
     var dd = document.createElement("dd");
     dd.textContent = String(value);
-    list.appendChild(dt);
-    list.appendChild(dd);
+    wrap.appendChild(dt);
+    wrap.appendChild(dd);
+    list.appendChild(wrap);
   }
 
   function line(label, cents, tone) {
@@ -249,16 +257,18 @@
     fact(facts, "Consentement", d.consent_given ? "Accordé" : "Absent");
   }
 
+  /* The type of place is in the page heading and the postal code is in the address
+     above -- both were repeated here, and a card that mostly restates its
+     neighbours is a card you stop reading. What is left is only what this card
+     alone says: the numbers that decide how long the job takes. */
   function renderProperty(d) {
     var list = el("d-property");
     list.innerHTML = "";
-    fact(list, "Type", A.PROPERTY_LABELS[d.property_type] || d.property_type);
     fact(list, "Superficie", d.area_sqft ? d.area_sqft + " pi²" : "");
-    fact(list, "Étages", d.floors);
     fact(list, "Chambres", d.bedrooms);
     fact(list, "Salles de bain", d.bathrooms);
     fact(list, "Toilettes", d.restrooms);
-    fact(list, "Code postal", d.postal_code);
+    fact(list, "Étages", d.floors);
   }
 
   /* Only when there is attribution worth reading.
@@ -347,6 +357,321 @@
     });
   }
 
+  /* ---------- correcting what the customer told us ----------
+   *
+   * A quote form is a first draft. Somebody types 1200 for a 2100 pi² condo, drops
+   * a digit out of their phone number, or leaves the address blank and gives it on
+   * the call. All of that used to be frozen the moment they pressed send, and
+   * fixing a typo in an email address meant opening psql.
+   *
+   * ONE CARD AT A TIME, editing in place. Not a modal: the point of the correction
+   * is usually the photo or the note sitting beside it, and a dialog over the page
+   * hides exactly what you are looking at. Not one big form either -- three small
+   * ones mean a save touches three fields, not thirty, and a mistake in one card
+   * cannot blank another.
+   *
+   * The field bounds below are the API's, repeated in the markup so the browser
+   * catches a slip before it costs a round trip. The API still enforces them: this
+   * is a courtesy, not the check.
+   */
+
+  var PREFERRED = [
+    { value: "", label: "—" },
+    { value: "email", label: "Courriel" },
+    { value: "phone", label: "Téléphone" }
+  ];
+
+  var EDITORS = {
+    contact: {
+      title: "Coordonnées",
+      fields: [
+        { name: "full_name", label: "Nom", type: "text", attrs: { required: "", maxlength: "160" } },
+        { name: "company", label: "Entreprise", type: "text", attrs: { maxlength: "160" } },
+        { name: "email", label: "Courriel", type: "email", attrs: { maxlength: "255" } },
+        { name: "phone", label: "Téléphone", type: "tel", attrs: { maxlength: "40" } },
+        { name: "preferred_contact", label: "Contact préféré", type: "select", options: PREFERRED },
+        { name: "address_line", label: "Adresse", type: "text", attrs: { maxlength: "255" }, wide: true },
+        { name: "city", label: "Ville", type: "text", attrs: { maxlength: "120" } },
+        { name: "borough", label: "Quartier", type: "text", attrs: { maxlength: "120" } },
+        { name: "postal_code", label: "Code postal", type: "text", attrs: { maxlength: "12" } }
+      ]
+    },
+    property: {
+      title: "La propriété",
+      /* `when` keeps the other audience's questions off the screen -- a shop has no
+         bedrooms, and a field that is not shown is not sent, so the value the
+         customer never gave stays untouched. */
+      fields: [
+        { name: "area_sqft", label: "Superficie (pi²)", type: "number",
+          attrs: { min: "100", max: "1000000", inputmode: "numeric" } },
+        { name: "bedrooms", label: "Chambres", type: "number",
+          attrs: { min: "0", max: "20", inputmode: "numeric" }, when: "residential" },
+        { name: "bathrooms", label: "Salles de bain", type: "number",
+          attrs: { min: "0", max: "20", inputmode: "numeric" }, when: "residential" },
+        { name: "restrooms", label: "Sanitaires", type: "number",
+          attrs: { min: "0", max: "200", inputmode: "numeric" }, when: "commercial" },
+        { name: "floors", label: "Étages", type: "number",
+          attrs: { min: "1", max: "100", inputmode: "numeric" }, when: "commercial" }
+      ],
+      note: "Le type de lieu n'est pas modifiable : il décide de la grille de prix. " +
+            "Le prix calculé plus haut reste celui affiché au client lors de l'envoi."
+    },
+    request: {
+      title: "La demande",
+      fields: [
+        { name: "desired_start", label: "Début souhaité", type: "date" },
+        { name: "access_notes", label: "Notes d'accès", type: "textarea",
+          attrs: { rows: "4", maxlength: "2000" }, wide: true }
+      ]
+    }
+  };
+
+  /* Which field each rejection belongs to, so a 422 lands on the input that caused
+     it rather than in a box at the bottom saying something went wrong. */
+  var FIELD_MESSAGES = {
+    full_name: "Le nom est requis (au moins deux caractères).",
+    email: "Ce courriel n'est pas valide.",
+    phone: "Ce numéro est trop long.",
+    preferred_contact: "Choisissez courriel ou téléphone.",
+    area_sqft: "Entrez une superficie entre 100 et 1 000 000 pi².",
+    bedrooms: "Entre 0 et 20.",
+    bathrooms: "Entre 0 et 20.",
+    restrooms: "Entre 0 et 200.",
+    floors: "Entre 1 et 100.",
+    desired_start: "Date invalide.",
+    access_notes: "Ces notes sont trop longues (2000 caractères maximum)."
+  };
+
+  function fieldValue(name) {
+    var raw = detail[name];
+    return raw === null || raw === undefined ? "" : String(raw);
+  }
+
+  function buildEditor(key) {
+    var spec = EDITORS[key];
+    var form = document.querySelector('[data-form="' + key + '"]');
+    form.innerHTML = "";
+
+    var grid = document.createElement("div");
+    grid.className = "editgrid";
+
+    spec.fields.forEach(function (f) {
+      if (f.when && f.when !== detail.audience) return;
+
+      var wrap = document.createElement("div");
+      wrap.className = "editfield" + (f.wide ? " is-wide" : "");
+      var id = "edit-" + key + "-" + f.name;
+
+      var label = document.createElement("label");
+      label.setAttribute("for", id);
+      label.textContent = f.label;
+      wrap.appendChild(label);
+
+      var control;
+      if (f.type === "select") {
+        control = document.createElement("select");
+        f.options.forEach(function (o) {
+          var option = document.createElement("option");
+          option.value = o.value;
+          option.textContent = o.label;
+          control.appendChild(option);
+        });
+      } else if (f.type === "textarea") {
+        control = document.createElement("textarea");
+      } else {
+        control = document.createElement("input");
+        control.type = f.type;
+      }
+      control.id = id;
+      control.name = f.name;
+      Object.keys(f.attrs || {}).forEach(function (k) { control.setAttribute(k, f.attrs[k]); });
+      control.value = fieldValue(f.name);
+      /* aria-describedby is set even though the box starts empty: adding it only
+         when an error appears means a screen reader that has already read the
+         field never hears about it. */
+      control.setAttribute("aria-describedby", id + "-err");
+      wrap.appendChild(control);
+
+      var err = document.createElement("p");
+      err.className = "field-error";
+      err.id = id + "-err";
+      err.hidden = true;
+      err.setAttribute("role", "alert");
+      wrap.appendChild(err);
+
+      grid.appendChild(wrap);
+    });
+    form.appendChild(grid);
+
+    if (spec.note) {
+      var note = document.createElement("p");
+      note.className = "note";
+      note.textContent = spec.note;
+      form.appendChild(note);
+    }
+
+    var box = document.createElement("div");
+    box.className = "alert";
+    box.setAttribute("role", "alert");
+    box.hidden = true;
+    box.dataset.role = "formerror";
+    form.appendChild(box);
+
+    var foot = document.createElement("div");
+    foot.className = "row editfoot";
+    var cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn btn-ghost";
+    cancel.textContent = "Annuler";
+    cancel.dataset.cancel = key;
+    var save = document.createElement("button");
+    save.type = "submit";
+    save.className = "btn btn-primary";
+    save.textContent = "Enregistrer";
+    save.dataset.save = key;
+    foot.appendChild(cancel);
+    foot.appendChild(save);
+    form.appendChild(foot);
+
+    return form;
+  }
+
+  function openEditor(key) {
+    if (!detail) return;
+    closeEditors();
+    var form = buildEditor(key);
+    document.querySelector('[data-view="' + key + '"]').hidden = true;
+    form.hidden = false;
+    var button = document.querySelector('[data-edit="' + key + '"]');
+    if (button) button.hidden = true;
+    var first = form.querySelector("input, select, textarea");
+    if (first && first.focus) first.focus();
+  }
+
+  function closeEditors() {
+    Object.keys(EDITORS).forEach(function (key) {
+      var form = document.querySelector('[data-form="' + key + '"]');
+      var view = document.querySelector('[data-view="' + key + '"]');
+      var button = document.querySelector('[data-edit="' + key + '"]');
+      if (form) { form.hidden = true; form.innerHTML = ""; }
+      if (view) view.hidden = false;
+      if (button) button.hidden = false;
+    });
+  }
+
+  function showFieldErrors(form, body) {
+    var detailBody = body && body.detail;
+    var box = form.querySelector('[data-role="formerror"]');
+    form.querySelectorAll(".field-error").forEach(function (p) {
+      p.hidden = true; p.textContent = "";
+    });
+    form.querySelectorAll("[aria-invalid]").forEach(function (c) {
+      c.removeAttribute("aria-invalid");
+    });
+
+    /* A string detail is one we raised on purpose -- the refusal to leave a request
+       with no email and no phone. It is written for Amine, so show it as it is. */
+    if (typeof detailBody === "string") {
+      box.textContent = detailBody;
+      box.hidden = false;
+      return true;
+    }
+    if (!Array.isArray(detailBody)) return false;
+
+    var marked = 0;
+    detailBody.forEach(function (item) {
+      var loc = item && item.loc;
+      if (!Array.isArray(loc)) return;
+      var name = loc[loc.length - 1];
+      var control = form.querySelector('[name="' + name + '"]');
+      if (!control) return;
+      var err = form.querySelector("#" + control.id + "-err");
+      if (!err) return;
+      err.textContent = FIELD_MESSAGES[name] || (item.msg || "Valeur refusée.");
+      err.hidden = false;
+      control.setAttribute("aria-invalid", "true");
+      marked++;
+    });
+    if (marked) {
+      box.textContent = "Corrigez les champs indiqués.";
+      box.hidden = false;
+      var bad = form.querySelector('[aria-invalid="true"]');
+      if (bad && bad.focus) bad.focus();
+      return true;
+    }
+    return false;
+  }
+
+  function saveEditor(key, form) {
+    var spec = EDITORS[key];
+    var payload = {};
+    /* Only the fields this card put on screen. An absent key means "leave it
+       alone" on the server, which is how one card's save cannot blank another's
+       fields -- and why an emptied box (sent as "") clears just that one. */
+    spec.fields.forEach(function (f) {
+      var control = form.querySelector('[name="' + f.name + '"]');
+      if (control) payload[f.name] = control.value;
+    });
+
+    var save = form.querySelector("[data-save]");
+    save.disabled = true;
+    save.textContent = "Enregistrement…";
+
+    A.api("/requests/" + encodeURIComponent(detail.id) + "/customer", {
+      method: "PATCH", body: JSON.stringify(payload)
+    }).then(function (updated) {
+      closeEditors();
+      renderAll(updated);
+      var card = el(key + "-card");
+      if (card) {
+        card.classList.add("saved");
+        setTimeout(function () { card.classList.remove("saved"); }, 900);
+      }
+    }, function (err) {
+      save.disabled = false;
+      save.textContent = "Enregistrer";
+      if (err === "auth") return;
+      if (err && err.status === 422 && showFieldErrors(form, err.body)) return;
+      var box = form.querySelector('[data-role="formerror"]');
+      box.textContent = A.apiMessage(err);
+      box.hidden = false;
+    });
+  }
+
+  document.addEventListener("click", function (event) {
+    var open = event.target.closest("[data-edit]");
+    if (open) { openEditor(open.dataset.edit); return; }
+    var cancel = event.target.closest("[data-cancel]");
+    if (cancel) { closeEditors(); return; }
+  });
+
+  document.addEventListener("submit", function (event) {
+    var form = event.target.closest("[data-form]");
+    if (!form) return;
+    event.preventDefault();
+    saveEditor(form.dataset.form, form);
+  });
+
+  /* Escape closes whichever card is open, the same as Annuler. The offer dialog
+     has its own handler and stops here, so this cannot close both at once. */
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    if (!el("offer").hidden || !el("lightbox").hidden) return;
+    if (document.querySelector("[data-form]:not([hidden])")) closeEditors();
+  });
+
+  function renderAll(data) {
+    detail = data;
+    renderHead(data);
+    renderPhotos(data);
+    renderRequest(data);
+    renderBreakdown(data);
+    renderContact(data);
+    renderProperty(data);
+    renderSource(data);
+    renderAction(data);
+  }
+
   function load() {
     var id = param("id");
     if (!id) {
@@ -359,18 +684,11 @@
     objectUrls = [];
 
     A.api("/requests/" + encodeURIComponent(id)).then(function (data) {
-      detail = data;
       el("loading").hidden = true;
       el("panel-error").hidden = true;
       el("detail").hidden = false;
-      renderHead(data);
-      renderPhotos(data);
-      renderRequest(data);
-      renderBreakdown(data);
-      renderContact(data);
-      renderProperty(data);
-      renderSource(data);
-      renderAction(data);
+      closeEditors();
+      renderAll(data);
     }, function (err) {
       if (err === "auth") return;
       el("loading").hidden = true;
