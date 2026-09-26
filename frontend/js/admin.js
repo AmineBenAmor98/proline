@@ -142,126 +142,27 @@
         /* Disabled without an address rather than hidden: a row with no email is
            a phone call, and the greyed button with its reason says that, where a
            missing button would just look like a bug. */
-        '<td><button type="button" class="btn btn-ghost btn-sm offer-btn"' +
-          (row.email ? "" : ' disabled title="Cette demande n\'a pas de courriel"') +
-          ">Envoyer l'offre</button></td>" +
+        '<td><a class="btn btn-ghost btn-sm" href="/admin/demande?id=' + A.esc(row.id) +
+          /* Always a link, even with no email: the page carries the photos and
+             the phone number, which is how an emailless request gets quoted. */
+          (row.email ? '">Ouvrir' : '" title="Pas de courriel — à rappeler">Ouvrir') +
+          "</a></td>" +
         "<td>" + A.esc(row.utm_campaign || (row.gclid ? "Google Ads" : "direct")) + "</td>" +
         "</tr>";
     }).join("");
   }
 
 
-  /* ---------- the offer composer ----------
+  /* THE OFFER COMPOSER USED TO LIVE HERE, as a dialog over this table.
 
-     Sending an offer is the only irreversible thing this panel does: a stranger
-     receives a price the business is then expected to honour. So the flow is
-     deliberately two steps with the real text in between, and the text is
-     rendered by the server -- by the same function that sends it -- rather than
-     assembled here, where it could drift from what actually goes out. */
+     It moved to /admin/demande, and not for tidiness. Quoting well now means
+     looking at the customer's photos first -- that is the entire reason they
+     are collected -- and a composer that opens straight from the inbox is a
+     way to send a price without ever having seen them. The Offre column links
+     to that page now, so the photos are always on the path to the send button
+     rather than somewhere off to one side.
 
-  var offerBox = document.getElementById("offer");
-  var offerRow = null;          // the row being quoted
-  var previewTimer = null;
-  var lastFocus = null;
-
-  function offerEl(id) { return document.getElementById(id); }
-
-  function openOffer(row) {
-    offerRow = row;
-    lastFocus = document.activeElement;
-    offerEl("offer-to").textContent = "À : " + (row.full_name || "") + " <" + row.email + ">";
-    offerEl("offer-price").value = A.moneyExact(
-      row.quoted_total_cents !== null && row.quoted_total_cents !== undefined
-        ? row.quoted_total_cents
-        : (row.computed_total_cents || 0));
-    /* A default worth sending, not a blank page. Most offers are this sentence
-       with a date changed. */
-    offerEl("offer-message").value =
-      "Merci pour votre demande. Voici notre offre pour l'entretien de votre " +
-      "propriété. Nous pouvons commencer dès la semaine prochaine — dites-nous " +
-      "le moment qui vous convient.";
-    offerEl("offer-error").hidden = true;
-    offerEl("offer-preview").textContent = "…";
-    offerBox.hidden = false;
-    offerEl("offer-card").focus();
-    refreshPreview();
-  }
-
-  function closeOffer() {
-    offerBox.hidden = true;
-    offerRow = null;
-    if (lastFocus && lastFocus.focus) lastFocus.focus();
-  }
-
-  /* The send button stays disabled until a preview has come back. You cannot
-     send something you have not been shown. */
-  function refreshPreview() {
-    if (!offerRow) return;
-    var cents = A.parseMoney(offerEl("offer-price").value);
-    var message = offerEl("offer-message").value.trim();
-    var send = offerEl("offer-send");
-    send.disabled = true;
-    if (cents === null || !message) {
-      offerEl("offer-preview").textContent =
-        cents === null ? "Entrez un prix valide." : "Écrivez un message.";
-      return;
-    }
-    A.api("/requests/" + offerRow.id + "/offer/preview", {
-      method: "POST",
-      body: JSON.stringify({ message: message, total_cents: cents })
-    }).then(function (data) {
-      offerEl("offer-preview").textContent = "Objet : " + data.subject + "\n\n" + data.text;
-      send.disabled = false;
-    }, function (err) {
-      if (err === "auth") return;
-      offerEl("offer-preview").textContent = A.apiMessage(err);
-    });
-  }
-
-  function schedulePreview() {
-    clearTimeout(previewTimer);
-    previewTimer = setTimeout(refreshPreview, 350);
-  }
-
-  if (offerBox) {
-    offerEl("offer-price").addEventListener("input", schedulePreview);
-    offerEl("offer-message").addEventListener("input", schedulePreview);
-    offerEl("offer-cancel").addEventListener("click", closeOffer);
-    offerBox.addEventListener("click", function (event) {
-      if (event.target === offerBox) closeOffer();
-    });
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && !offerBox.hidden) closeOffer();
-    });
-
-    offerEl("offer-send").addEventListener("click", function () {
-      if (!offerRow) return;
-      var button = this;
-      var cents = A.parseMoney(offerEl("offer-price").value);
-      button.disabled = true;
-      button.textContent = "Envoi…";
-      offerEl("offer-error").hidden = true;
-      A.api("/requests/" + offerRow.id + "/offer", {
-        method: "POST",
-        body: JSON.stringify({
-          message: offerEl("offer-message").value.trim(),
-          total_cents: cents
-        })
-      }).then(function () {
-        closeOffer();
-        load();   /* the row moves to Envoyée and the price appears */
-      }, function (err) {
-        if (err === "auth") return;
-        /* Left open on failure, with the text intact: the message took effort
-           to write and nothing was delivered, so it must not be lost. */
-        offerEl("offer-error").textContent = A.apiMessage(err);
-        offerEl("offer-error").hidden = false;
-      }).then(function () {
-        button.disabled = false;
-        button.textContent = "Envoyer à ce client";
-      });
-    });
-  }
+     `git log -p -- frontend/js/admin.js` has the dialog if it is ever wanted. */
 
   function load() {
     panelError.hidden = true;
@@ -321,14 +222,6 @@
       renderStats(data);
     }).catch(function () { /* the tallies are not worth an error message */ });
   }
-
-  tbody.addEventListener("click", function (event) {
-    var button = event.target.closest(".offer-btn");
-    if (!button || button.disabled) return;
-    var id = button.closest("tr").dataset.id;
-    var row = lastRows.filter(function (r) { return r.id === id; })[0];
-    if (row) openOffer(row);
-  });
 
   tbody.addEventListener("change", function (event) {
     var row = event.target.closest("tr");
