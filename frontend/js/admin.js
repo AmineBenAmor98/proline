@@ -139,14 +139,6 @@
           'placeholder="$" aria-label="' + A.esc("Prix envoyé — " + row.full_name) + '" value="' +
           (quoted !== null && quoted !== undefined ? A.moneyExact(quoted) : "") + '"></td>' +
         "<td>" + statusPicker(row) + "</td>" +
-        /* Disabled without an address rather than hidden: a row with no email is
-           a phone call, and the greyed button with its reason says that, where a
-           missing button would just look like a bug. */
-        '<td><a class="btn btn-ghost btn-sm" href="/admin/demande?id=' + A.esc(row.id) +
-          /* Always a link, even with no email: the page carries the photos and
-             the phone number, which is how an emailless request gets quoted. */
-          (row.email ? '">Ouvrir' : '" title="Pas de courriel — à rappeler">Ouvrir') +
-          "</a></td>" +
         "<td>" + A.esc(row.utm_campaign || (row.gclid ? "Google Ads" : "direct")) + "</td>" +
         "</tr>";
     }).join("");
@@ -159,7 +151,7 @@
      looking at the customer's photos first -- that is the entire reason they
      are collected -- and a composer that opens straight from the inbox is a
      way to send a price without ever having seen them. The Offre column links
-     to that page now, so the photos are always on the path to the send button
+     row now opens that page, so the photos are always on the path to the send
      rather than somewhere off to one side.
 
      `git log -p -- frontend/js/admin.js` has the dialog if it is ever wanted. */
@@ -222,6 +214,25 @@
       renderStats(data);
     }).catch(function () { /* the tallies are not worth an error message */ });
   }
+
+  /* THE WHOLE ROW OPENS THE REQUEST. There was an "Ouvrir" button in its own
+     column; a row that already looks clickable, with a small target you have to
+     aim at, is friction for the thing you do most.
+
+     Three things must still work inside it, so a click that lands on one of
+     them is left alone: the price input, the status picker, and the tel:/mailto:
+     links. The customer's name stays a real <a> as well -- a click handler on a
+     <tr> cannot be reached by keyboard, opened in a new tab, or middle-clicked,
+     and losing all three to save a column would be a poor trade. */
+  tbody.addEventListener("click", function (event) {
+    if (event.target.closest("input, select, a, button, label, option")) return;
+    /* Someone dragging to copy a phone number ends on a mouseup inside the row;
+       without this, that navigates away with the number still unselected. */
+    if (window.getSelection && String(window.getSelection())) return;
+    var tr = event.target.closest("tr");
+    if (!tr || !tr.dataset.id) return;
+    window.location.href = "/admin/demande?id=" + encodeURIComponent(tr.dataset.id);
+  });
 
   tbody.addEventListener("change", function (event) {
     var row = event.target.closest("tr");

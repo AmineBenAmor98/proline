@@ -1213,3 +1213,13 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
   width: 100%; max-height: 78vh; object-fit: contain;
   border-radius: var(--radius-sm); background: var(--line-soft); margin-bottom: 14px;
 }
+
+/* A row in the inbox opens the request. The cursor and the hover are the only
+   thing telling anyone that, so they are not decoration. */
+.admin-table tbody tr { cursor: pointer; transition: background var(--t); }
+.admin-table tbody tr:hover { background: var(--cream); }
+/* The controls inside a row are still controls: they keep their own cursor so
+   it is obvious they do something other than open the page. */
+.admin-table tbody tr input,
+.admin-table tbody tr select { cursor: auto; }
+.admin-table tbody tr a { cursor: pointer; }
