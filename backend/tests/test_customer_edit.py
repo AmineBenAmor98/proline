@@ -157,17 +157,77 @@ async def test_an_out_of_range_area_is_refused(client, admin_headers):
     assert (await _patch(client, request_id, admin_headers, {"area_sqft": 12})).status_code == 422
 
 
-async def test_the_property_type_is_not_editable(client, admin_headers):
-    """It decides which half of the pricing grid applies and is checked against the
-    audience on the way in. Changing it is a different request, not a correction."""
+async def test_the_property_type_is_editable_within_its_audience(client, admin_headers):
+    """"They ticked condo, it's a triplex." A correction, and a common one."""
+    request_id = await _submit(client)          # residential
+    body = (await _patch(client, request_id, admin_headers,
+                         {"property_type": "house"})).json()
+    assert body["property_type"] == "house"
+    assert body["audience"] == "residential"
+
+
+async def test_the_audience_cannot_be_changed_through_the_property_type(
+    client, admin_headers
+):
+    """THE AUDIENCE IS THE INVARIANT. The public form refuses a house filed as
+    commercial; this has to stay true afterwards, or the request is priced by a
+    half of the grid that never asked it any questions."""
     request_id = await _submit(client, COMMERCIAL)
     before = await _detail(client, request_id, admin_headers)
-    body = (await _patch(client, request_id, admin_headers, {
-        "property_type": "house", "audience": "residential", "city": "Laval",
-    })).json()
-    assert body["property_type"] == before["property_type"]
+    response = await _patch(client, request_id, admin_headers, {
+        "property_type": "house", "city": "Laval",
+    })
+    assert response.status_code == 422, response.text
+
+    # And the whole patch is refused, not half-applied.
+    after = await _detail(client, request_id, admin_headers)
+    assert after["property_type"] == before["property_type"]
+    assert after["audience"] == before["audience"]
+    assert after["city"] == before["city"]
+
+
+async def test_the_audience_itself_is_not_editable(client, admin_headers):
+    request_id = await _submit(client, COMMERCIAL)
+    before = await _detail(client, request_id, admin_headers)
+    body = (await _patch(client, request_id, admin_headers,
+                         {"audience": "residential", "city": "Laval"})).json()
     assert body["audience"] == before["audience"]
     assert body["city"] == "Laval", "the editable field in the same payload still saves"
+
+
+async def test_what_was_asked_for_is_editable(client, admin_headers):
+    """Frequency decides the recurring discount AND the period printed on the
+    quote email. "Actually, make it monthly" could be corrected nowhere."""
+    request_id = await _submit(client, COMMERCIAL)
+    body = (await _patch(client, request_id, admin_headers, {
+        "frequency": "monthly",
+        "night_access": True,
+        "services": ["office_cleaning", "common_areas"],
+    })).json()
+    assert body["frequency"] == "monthly"
+    assert body["night_access"] is True
+    assert sorted(body["services"]) == ["common_areas", "office_cleaning"]
+
+
+async def test_the_language_of_the_quote_is_editable(client, admin_headers):
+    """"Could you send that in English?" -- the offer email follows locale."""
+    request_id = await _submit(client)
+    body = (await _patch(client, request_id, admin_headers, {"locale": "en"})).json()
+    assert body["locale"] == "en"
+
+
+async def test_a_required_field_cannot_be_emptied(client, admin_headers):
+    """An emptied text box means "clear this". An emptied dropdown means the
+    browser sent nothing useful, and NULL in a NOT NULL column is an
+    IntegrityError with a message nobody can act on."""
+    request_id = await _submit(client)
+    before = await _detail(client, request_id, admin_headers)
+    for field in ("frequency", "locale", "property_type", "full_name"):
+        response = await _patch(client, request_id, admin_headers, {field: ""})
+        assert response.status_code == 422, (field, response.text)
+    after = await _detail(client, request_id, admin_headers)
+    assert after["frequency"] == before["frequency"]
+    assert after["locale"] == before["locale"]
 
 
 async def test_consent_is_not_editable(client, admin_headers):

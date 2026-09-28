@@ -428,6 +428,21 @@
     { value: "phone", label: "Téléphone" }
   ];
 
+  function options(values, labels) {
+    return values.map(function (value) {
+      return { value: value, label: (labels && labels[value]) || value };
+    });
+  }
+
+  /* The property types this request may become. Only its own audience's: the API
+     refuses the rest, because residential and commercial are priced by different
+     halves of the grid and were asked different questions. Turning a condo into a
+     shop is a new request, not a correction. */
+  function propertyTypeOptions() {
+    var list = (A.PROPERTY_TYPES_BY_AUDIENCE || {})[detail.audience] || [];
+    return options(list, A.PROPERTY_LABELS);
+  }
+
   var EDITORS = {
     contact: {
       title: "Coordonnées",
@@ -437,6 +452,10 @@
         { name: "email", label: "Courriel", type: "email", attrs: { maxlength: "255" } },
         { name: "phone", label: "Téléphone", type: "tel", attrs: { maxlength: "40" } },
         { name: "preferred_contact", label: "Contact préféré", type: "select", options: PREFERRED },
+        /* The offer email is written in this language. After "could you send that
+           in English?" there was nowhere to change it. */
+        { name: "locale", label: "Langue", type: "select",
+          options: function () { return options(["fr", "en"], A.LOCALE_LABELS); } },
         { name: "address_line", label: "Adresse", type: "text", attrs: { maxlength: "255" }, wide: true },
         { name: "city", label: "Ville", type: "text", attrs: { maxlength: "120" } },
         { name: "borough", label: "Quartier", type: "text", attrs: { maxlength: "120" } },
@@ -449,6 +468,8 @@
          bedrooms, and a field that is not shown is not sent, so the value the
          customer never gave stays untouched. */
       fields: [
+        { name: "property_type", label: "Type de lieu", type: "select",
+          options: propertyTypeOptions, wide: true },
         { name: "area_sqft", label: "Superficie (pi²)", type: "number",
           attrs: { min: "100", max: "1000000", inputmode: "numeric" } },
         { name: "bedrooms", label: "Chambres", type: "number",
@@ -460,13 +481,28 @@
         { name: "floors", label: "Étages", type: "number",
           attrs: { min: "1", max: "100", inputmode: "numeric" }, when: "commercial" }
       ],
-      note: "Le type de lieu n'est pas modifiable : il décide de la grille de prix. " +
-            "Le prix calculé plus haut reste celui affiché au client lors de l'envoi."
+      note: "Résidentiel ou commercial ne se change pas ici : les deux sont chiffrés " +
+            "par des grilles différentes. Le prix calculé plus haut reste celui " +
+            "affiché au client au moment de l'envoi."
     },
     request: {
       title: "La demande",
       fields: [
+        /* Frequency earns its place twice: it decides the recurring discount and
+           it is the period printed on the quote email. "Finalement, une fois par
+           mois" could be corrected nowhere. */
+        { name: "frequency", label: "Fréquence", type: "select",
+          options: function () {
+            return options(A.FREQUENCY_ORDER, A.FREQUENCY_LABELS);
+          } },
         { name: "desired_start", label: "Début souhaité", type: "date" },
+        { name: "services", label: "Services", type: "checkboxes", wide: true,
+          when: "commercial",
+          options: function () {
+            return options(Object.keys(A.SERVICE_LABELS), A.SERVICE_LABELS);
+          } },
+        { name: "night_access", label: "Passages de soir ou de nuit",
+          type: "checkbox", when: "commercial", wide: true },
         { name: "access_notes", label: "Notes d'accès", type: "textarea",
           attrs: { rows: "4", maxlength: "2000" }, wide: true }
       ]
@@ -514,10 +550,44 @@
       label.textContent = f.label;
       wrap.appendChild(label);
 
+      /* Options may be a list or a function of the request -- the property types
+         depend on its audience and the labels live in admin-common.js. */
+      var choices = typeof f.options === "function" ? f.options() : f.options;
+
       var control;
-      if (f.type === "select") {
+      if (f.type === "checkbox") {
+        /* A lone boolean reads as a statement you tick, not a labelled field, so
+           the label goes beside the box and the field's own <label> is dropped. */
+        wrap.removeChild(label);
+        var row = document.createElement("label");
+        row.className = "checkrow";
+        control = document.createElement("input");
+        control.type = "checkbox";
+        control.checked = !!detail[f.name];
+        row.appendChild(control);
+        row.appendChild(document.createTextNode(" " + f.label));
+        wrap.appendChild(row);
+      } else if (f.type === "checkboxes") {
+        var chosen = detail[f.name] || [];
+        var box = document.createElement("div");
+        box.className = "checkgrid";
+        choices.forEach(function (o) {
+          var item = document.createElement("label");
+          item.className = "checkrow";
+          var input = document.createElement("input");
+          input.type = "checkbox";
+          input.value = o.value;
+          input.checked = chosen.indexOf(o.value) !== -1;
+          input.setAttribute("data-group", f.name);
+          item.appendChild(input);
+          item.appendChild(document.createTextNode(" " + o.label));
+          box.appendChild(item);
+        });
+        wrap.appendChild(box);
+        control = box;          // carries the name for the save below
+      } else if (f.type === "select") {
         control = document.createElement("select");
-        f.options.forEach(function (o) {
+        choices.forEach(function (o) {
           var option = document.createElement("option");
           option.value = o.value;
           option.textContent = o.label;
@@ -530,14 +600,24 @@
         control.type = f.type;
       }
       control.id = id;
-      control.name = f.name;
+      /* setAttribute, not `.name`: a <div> has no reflected name property, so the
+         assignment would set an expando the form's querySelector cannot see --
+         and the services group would silently never be found on save. */
+      control.setAttribute("name", f.name);
       Object.keys(f.attrs || {}).forEach(function (k) { control.setAttribute(k, f.attrs[k]); });
-      control.value = fieldValue(f.name);
+      if (f.type !== "checkbox" && f.type !== "checkboxes") {
+        control.value = fieldValue(f.name);
+      }
       /* aria-describedby is set even though the box starts empty: adding it only
          when an error appears means a screen reader that has already read the
          field never hears about it. */
       control.setAttribute("aria-describedby", id + "-err");
-      wrap.appendChild(control);
+      /* A lone checkbox is ALREADY inside its .checkrow label. appendChild moves
+         a node rather than copying it, so appending it again here tore it out of
+         the row and made it a direct child of .editfield -- where the full-width
+         input rule caught it and drew a 40px square adrift in the middle of the
+         card, with its words stranded on the line above. */
+      if (!wrap.contains(control)) wrap.appendChild(control);
 
       var err = document.createElement("p");
       err.className = "field-error";
@@ -657,7 +737,16 @@
        fields -- and why an emptied box (sent as "") clears just that one. */
     spec.fields.forEach(function (f) {
       var control = form.querySelector('[name="' + f.name + '"]');
-      if (control) payload[f.name] = control.value;
+      if (!control) return;
+      if (f.type === "checkbox") {
+        payload[f.name] = !!control.checked;
+      } else if (f.type === "checkboxes") {
+        payload[f.name] = Array.prototype.map.call(
+          control.querySelectorAll("input:checked"), function (i) { return i.value; }
+        );
+      } else {
+        payload[f.name] = control.value;
+      }
     });
 
     var save = form.querySelector("[data-save]");

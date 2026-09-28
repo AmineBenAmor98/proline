@@ -37,10 +37,27 @@ class MailNotConfigured(RuntimeError):
 
 
 def build_message(
-    settings: Settings, *, to: str, subject: str, text: str
+    settings: Settings,
+    *,
+    to: str,
+    subject: str,
+    text: str,
+    html: str | None = None,
+    inline: dict[str, tuple[bytes, str]] | None = None,
 ) -> EmailMessage:
-    """Plain text, deliberately. An offer is a price and a paragraph; an HTML
-    part would only give it more ways to render badly in someone's inbox."""
+    """Text always; HTML as an alternative when one is given.
+
+    This used to be text-only on the argument that an HTML part "would only give
+    it more ways to render badly". That argument is right about the risk and
+    wrong about the remedy: multipart/alternative carries BOTH, and a client
+    that would have rendered the HTML badly is a client that shows the text
+    instead. Text-only did not avoid the bad rendering -- it chose it for
+    everyone, on a document quoting a stranger four figures.
+
+    The text part is written first and stays the record of what was sent. Order
+    matters in multipart/alternative: least-rich first, and a reader shows the
+    last part it understands.
+    """
     message = EmailMessage()
     message["From"] = settings.mail_from
     message["To"] = to
@@ -50,6 +67,21 @@ def build_message(
     # client's reply goes to whatever bounce address the provider used.
     message["Reply-To"] = settings.mail_reply_to or settings.mail_from
     message.set_content(text)
+    if html:
+        message.add_alternative(html, subtype="html")
+        # Images travel WITH the message, referenced as cid:, never fetched from
+        # our server. A remote <img> is what makes a mail client print "this
+        # message has blocked content" across the top of a quote -- to a stranger
+        # deciding whether to trust us with their keys -- and it doubles as a
+        # read receipt the recipient never agreed to.
+        #
+        # They attach to the HTML part, not the message: attaching to the message
+        # would make it multipart/mixed and the logo would arrive as a file to
+        # download rather than a picture in the layout.
+        for cid, (data, subtype) in (inline or {}).items():
+            message.get_payload()[-1].add_related(
+                data, maintype="image", subtype=subtype, cid=f"<{cid}>"
+            )
     return message
 
 

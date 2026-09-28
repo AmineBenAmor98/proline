@@ -203,3 +203,55 @@ def test_the_admin_stylesheet_does_not_reach_into_the_public_site():
     assert "\n.card-action {" not in css, (
         ".card-action must be .admin-body .card-action, or .admin-body .card outranks it"
     )
+
+
+def test_the_admin_label_tables_match_the_enums():
+    """admin-common.js keeps client-side copies of the enums -- labels, and which
+    property types belong to which audience. A copy that drifts from the original
+    shows the operator a dropdown whose options the API then refuses, which reads
+    as a broken save rather than as a stale table.
+    """
+    import json as _json
+
+    from app.models.enums import (
+        AUDIENCE_BY_PROPERTY_TYPE,
+        Frequency,
+        PropertyType,
+        RequestStatus,
+        ServiceCode,
+    )
+
+    js = (FRONTEND / "js" / "admin-common.js").read_text()
+
+    def table(name: str) -> dict:
+        """The object literal assigned to `var <name> = {...};`."""
+        start = js.index(f"var {name} = {{") + len(f"var {name} = ")
+        depth, i = 0, start
+        while True:
+            if js[i] == "{":
+                depth += 1
+            elif js[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        body = js[start:i + 1]
+        # JS object literal -> JSON: quote the bare keys.
+        return _json.loads(re.sub(r"(\w+):", r'"\1":', body).replace("'", '"'))
+
+    def array(name: str) -> list:
+        start = js.index(f"var {name} = [") + len(f"var {name} = ")
+        end = js.index("]", start) + 1
+        return _json.loads(js[start:end].replace("'", '"'))
+
+    assert set(table("PROPERTY_LABELS")) == {p.value for p in PropertyType}
+    assert set(table("FREQUENCY_LABELS")) == {f.value for f in Frequency}
+    assert set(table("SERVICE_LABELS")) == {s.value for s in ServiceCode}
+    assert set(array("FREQUENCY_ORDER")) == {f.value for f in Frequency}
+    assert set(array("STATUS_ORDER")) == {s.value for s in RequestStatus}
+
+    by_audience = table("PROPERTY_TYPES_BY_AUDIENCE")
+    expected: dict[str, set[str]] = {}
+    for kind, audience in AUDIENCE_BY_PROPERTY_TYPE.items():
+        expected.setdefault(audience.value, set()).add(kind.value)
+    assert {k: set(v) for k, v in by_audience.items()} == expected

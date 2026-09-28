@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
-from app.models.enums import Audience, Frequency, RequestStatus
+from app.models.enums import Audience, Frequency, PropertyType, RequestStatus, ServiceCode
 
 
 class LoginIn(BaseModel):
@@ -132,9 +132,11 @@ class AdminCustomerPatch(BaseModel):
     and the only way to fix a typo in an email address was a database client.
 
     WHAT IS DELIBERATELY NOT HERE:
-      * audience and property_type -- they decide which half of the pricing grid
-        applies and are checked against each other on the way in. Changing a triplex
-        into a shop is not a correction, it is a different request.
+      * audience -- residential and commercial are priced by different halves of
+        the grid and asked different questions. A shop that came in as a condo is
+        not a typo to fix, it is a request to submit again. `property_type` IS
+        editable, but only among the types belonging to the audience the request
+        already has, so the invariant the public form enforces still holds.
       * consent_given -- a record of what the customer agreed to. Ours to honour,
         not to edit.
       * the attribution fields -- captured once on arrival. A campaign you can
@@ -142,6 +144,11 @@ class AdminCustomerPatch(BaseModel):
       * computed_breakdown -- what the visitor was actually shown at submission.
         Editing the area does not rewrite history; the price to send is its own
         field and always was.
+      * extras and modifiers -- they are what the stored breakdown was computed
+        FROM. Changing them without recomputing would leave a price whose own
+        itemisation contradicts it, and recomputing would overwrite the record of
+        what the visitor was quoted. Both are worse than leaving them alone: put
+        the change in the message, or in the price you send.
 
     Every field is optional AND absence means "leave it alone", which is not the
     same as null. The endpoint reads `model_fields_set`, so a payload of
@@ -166,6 +173,19 @@ class AdminCustomerPatch(BaseModel):
     floors: Annotated[int, Field(ge=1, le=100)] | None = None
     restrooms: Annotated[int, Field(ge=0, le=200)] | None = None
 
+    # What was asked for. `frequency` earns its place twice over: it decides the
+    # recurring discount and it is the period printed on the quote email, so a
+    # customer moving from weekly to monthly changes both and could be corrected
+    # nowhere.
+    property_type: PropertyType | None = None
+    frequency: Frequency | None = None
+    services: Annotated[list[ServiceCode], Field(max_length=12)] | None = None
+    night_access: bool | None = None
+
+    # Which language their quote is written in. The email follows it, so after
+    # "actually, could you send that in English?" this is the switch.
+    locale: Annotated[str, Field(pattern="^(fr|en)$")] | None = None
+
     desired_start: date | None = None
     access_notes: Annotated[str, Field(max_length=2000)] | None = None
 
@@ -173,6 +193,7 @@ class AdminCustomerPatch(BaseModel):
         "full_name", "company", "email", "phone", "preferred_contact",
         "address_line", "city", "borough", "postal_code", "access_notes",
         "area_sqft", "bedrooms", "bathrooms", "floors", "restrooms", "desired_start",
+        "property_type", "frequency", "locale",
         mode="before",
     )
     @classmethod

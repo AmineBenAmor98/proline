@@ -1215,6 +1215,23 @@ fieldset.wizard-step { border: 0; padding: 0; margin: 0; min-width: 0; }
 .editfield [aria-invalid="true"] { border-color: var(--danger); }
 .editfield .field-error { margin: 4px 0 0; }
 .editfoot { justify-content: flex-end; gap: 10px; margin-top: 14px; }
+/* A tick you read as a sentence, not a labelled field: the words sit beside the
+   box and the whole row is the hit target.
+   SCOPED TO .editfield, and that is the whole trick. `.editfield label` above is
+   (0,1,1) -- one class and one element -- so a bare `.checkrow` lost to it and
+   every tick came out as a small uppercase grey field label with the box adrift
+   on the line below it. */
+.editfield .checkrow {
+  display: flex; align-items: center; gap: 8px; padding: 4px 0; margin: 0;
+  font-size: 0.92rem; font-weight: 400; letter-spacing: 0; text-transform: none;
+  color: var(--ink); cursor: pointer;
+}
+.editfield .checkrow input[type="checkbox"] {
+  width: 17px; height: 17px; min-height: 0; padding: 0; flex: none;
+  accent-color: var(--navy);
+}
+.checkgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+@media (max-width: 560px) { .checkgrid { grid-template-columns: minmax(0, 1fr); } }
 /* The same green flash the inbox rows use when a save lands, so "it saved" reads
    the same way on both screens. */
 .card.saved { background: #f2fbf6; transition: background 0.9s ease; }

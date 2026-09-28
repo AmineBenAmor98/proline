@@ -23,7 +23,11 @@ from app.core.security import (
 )
 from app.db.session import get_session
 from app.models import Lead, OfferEmail, Property, Quote, QuotePhoto, QuoteRequest
-from app.models.enums import PHOTO_ZONE_LABELS_FR, RequestStatus
+from app.models.enums import (
+    AUDIENCE_BY_PROPERTY_TYPE,
+    PHOTO_ZONE_LABELS_FR,
+    RequestStatus,
+)
 from app.schemas.admin import (
     AdminCustomerPatch,
     AdminPhoto,
@@ -347,9 +351,22 @@ _CUSTOMER_FIELDS: dict[str, str] = {
     "bathrooms": "property",
     "floors": "property",
     "restrooms": "property",
+    "locale": "lead",
+    "property_type": "property",
     "desired_start": "request",
     "access_notes": "request",
+    "frequency": "request",
+    "services": "request",
+    "night_access": "request",
 }
+
+# Columns the database will not accept a NULL in. An emptied text box legitimately
+# means "clear this"; an emptied dropdown means the browser sent nothing useful,
+# and writing None would be an IntegrityError five lines later with a message
+# nobody can act on.
+_REQUIRED: frozenset[str] = frozenset({
+    "full_name", "locale", "property_type", "frequency", "services", "night_access",
+})
 
 
 @router.patch("/requests/{request_id}/customer", response_model=AdminRequestDetail)
@@ -378,6 +395,25 @@ async def update_customer(
     unknown = set(given) - set(_CUSTOMER_FIELDS)
     if unknown:  # pragma: no cover - the schema cannot produce this
         raise HTTPException(status_code=422, detail=f"not editable: {sorted(unknown)}")
+
+    emptied = sorted(f for f in given if f in _REQUIRED and given[f] is None)
+    if emptied:
+        raise HTTPException(
+            status_code=422, detail=f"ces champs ne peuvent pas être vides : {emptied}"
+        )
+
+    # THE AUDIENCE IS THE INVARIANT, not the property type. The public form checks
+    # the two against each other on the way in and refuses a house filed as
+    # commercial; this keeps that true afterwards. Correcting a condo to a triplex
+    # is a correction. Turning it into a shop is a different request, priced by a
+    # different half of the grid and asked different questions.
+    new_type = given.get("property_type")
+    if new_type is not None and AUDIENCE_BY_PROPERTY_TYPE[new_type] is not request.audience:
+        raise HTTPException(
+            status_code=422,
+            detail=f"« {new_type.value} » est un type {AUDIENCE_BY_PROPERTY_TYPE[new_type].value}"
+                   f" : cette demande est {request.audience.value}.",
+        )
 
     # A REQUEST WITH NEITHER AN EMAIL NOR A PHONE CANNOT BE ANSWERED, which is why
     # the public form refuses one. Checked against the merged result rather than the
@@ -516,13 +552,17 @@ async def preview_offer(
     exact text is shown first -- rendered by the same function that will send
     it, not by a lookalike in the browser that can drift from it.
     """
-    _request, lead, prop = await _request_with_people(session, request_id)
+    request, lead, prop = await _request_with_people(session, request_id)
+    # `request` is passed, not dropped: the reference, the frequency and the
+    # period the price covers all come off it, and a preview rendered without it
+    # would be a different email from the one that gets sent.
     subject, text = offers.render(
         settings,
         lead=lead,
         prop=prop,
         message=payload.message,
         total_cents=payload.total_cents,
+        request=request,
     )
     return OfferPreview(subject=subject, text=text, to_email=lead.email)
 

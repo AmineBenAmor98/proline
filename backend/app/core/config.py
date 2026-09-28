@@ -78,6 +78,15 @@ class Settings(BaseSettings):
     mail_from: str = "Proline Cleaning Solutions <contact@proline-cleaningsolutions.com>"
     mail_reply_to: str = ""
 
+    # Shown at the foot of a quote. The telephone number is on every page of the
+    # site and was on none of the emails -- a client ready to say yes had only a
+    # reply button. How long a quoted price is held is a commitment, so it is a
+    # setting rather than a number buried in a template.
+    business_name: str = "Proline Cleaning Solutions"
+    business_phone: str = "514 242-4779"
+    site_url: str = "https://proline-cleaningsolutions.com"
+    offer_valid_days: int = 30
+
     # Customer photos. Empty disables the feature outright: the form hides the
     # control and the upload endpoint answers 503. That is the switch to reach
     # for if the disk is filling, rather than editing the frontend.

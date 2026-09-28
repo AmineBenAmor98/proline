@@ -20,19 +20,42 @@ window.ProlineAdmin = (function () {
     one_time: "Une seule fois", weekly: "Chaque semaine", biweekly: "Aux 2 semaines",
     monthly: "Mensuel", to_discuss: "À déterminer"
   };
+  /* Explicit, like STATUS_ORDER: a dropdown reads least-often to most-often, and
+     that is an editorial decision rather than whatever order the keys happen to
+     have been typed in. */
+  var FREQUENCY_ORDER = ["one_time", "weekly", "biweekly", "monthly", "to_discuss"];
   var PROPERTY_LABELS = {
     house: "Maison", condo: "Condo", apartment: "Appartement", office: "Bureau",
     retail: "Commerce", building: "Immeuble", industrial: "Industriel",
     construction: "Chantier"
   };
 
+  /* Which property types belong to which half of the business. Mirrors
+     AUDIENCE_BY_PROPERTY_TYPE on the server, which is the authority -- the edit
+     form offers only the types matching the request's own audience, because
+     turning a condo into a shop is a different request and the API refuses it.
+     A test reads this table and compares it to the enum, so the copy cannot
+     quietly drift from the original. */
+  var PROPERTY_TYPES_BY_AUDIENCE = {
+    residential: ["house", "condo", "apartment"],
+    commercial: ["office", "retail", "building", "industrial", "construction"]
+  };
+
+  var LOCALE_LABELS = { fr: "Français", en: "Anglais" };
+
   /* Commercial services. Extras are NOT listed here on purpose: they live on the
      rate card, which carries their wording, and a second copy would drift. */
+  /* Every ServiceCode, and only those. This table had `disinfection`, which the
+     enum does not have, and was missing `garage` and `waste_management`, which it
+     does -- so a request asking for either showed the operator a raw code, and the
+     edit form would have offered no tick box for them at all. A test compares this
+     table to the enum for exactly that reason. */
   var SERVICE_LABELS = {
     residential_cleaning: "Ménage résidentiel", office_cleaning: "Bureaux",
     common_areas: "Aires communes", post_construction: "Post-construction",
     end_of_lease: "Fin de bail", floor_stripping_waxing: "Décapage et cirage",
-    carpets: "Tapis", windows: "Vitres", disinfection: "Désinfection"
+    carpets: "Tapis", windows: "Vitres", garage: "Garage",
+    waste_management: "Gestion des déchets"
   };
 
   function session() {
@@ -365,7 +388,10 @@ window.ProlineAdmin = (function () {
 
   return {
     STATUS_LABELS: STATUS_LABELS, STATUS_ORDER: STATUS_ORDER, FREQUENCY_LABELS: FREQUENCY_LABELS,
+    FREQUENCY_ORDER: FREQUENCY_ORDER,
     PROPERTY_LABELS: PROPERTY_LABELS, SERVICE_LABELS: SERVICE_LABELS,
+    PROPERTY_TYPES_BY_AUDIENCE: PROPERTY_TYPES_BY_AUDIENCE,
+    LOCALE_LABELS: LOCALE_LABELS,
     boot: boot, api: api, apiBlobUrl: apiBlobUrl, apiMessage: apiMessage,
     money: money, moneyExact: moneyExact, parseMoney: parseMoney,
     parseIntStrict: parseIntStrict, parseDecimalStrict: parseDecimalStrict,

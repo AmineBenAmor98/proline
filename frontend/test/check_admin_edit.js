@@ -181,7 +181,7 @@ function patches(win) {
     const names = [...win.document.querySelectorAll('[data-form="property"] [name]')]
       .map((c) => c.name).join(",");
     check("a condo is asked about bedrooms, not washrooms",
-      names === "area_sqft,bedrooms,bathrooms", names);
+      names === "property_type,area_sqft,bedrooms,bathrooms", names);
   }
   {
     const win = await boot({ audience: "commercial", property_type: "retail",
@@ -190,7 +190,7 @@ function patches(win) {
     const names = [...win.document.querySelectorAll('[data-form="property"] [name]')]
       .map((c) => c.name).join(",");
     check("a shop is asked about washrooms, not bedrooms",
-      names === "area_sqft,restrooms,floors", names);
+      names === "property_type,area_sqft,restrooms,floors", names);
   }
 
   // A save sends only this card's fields, and the page re-renders from the answer.
@@ -207,7 +207,7 @@ function patches(win) {
     if (sent.length) {
       const keys = Object.keys(sent[0]).sort().join(",");
       check("save: only the contact card's fields travel",
-        keys === "address_line,borough,city,company,email,full_name,phone,postal_code,preferred_contact",
+        keys === "address_line,borough,city,company,email,full_name,locale,phone,postal_code,preferred_contact",
         keys);
       check("save: no property field is in the body",
         !("area_sqft" in sent[0]) && !("bedrooms" in sent[0]), keys);
@@ -312,7 +312,7 @@ function patches(win) {
     await save(win, "request");
     const sent = patches(win)[0];
     check("request card: only its own fields travel",
-      Object.keys(sent).sort().join(",") === "access_notes,desired_start",
+      Object.keys(sent).sort().join(",") === "access_notes,desired_start,frequency",
       Object.keys(sent).sort().join(","));
     check("request card: the note is on screen after saving",
       /chien dans la cour/.test(win.document.getElementById("d-notes").textContent),
@@ -331,6 +331,73 @@ function patches(win) {
     check("the corrected area is on screen",
       /2 100|2 100|2100/.test(win.document.getElementById("d-property").textContent),
       win.document.getElementById("d-property").textContent);
+  }
+
+  // The new controls: what was asked for, and the language of the quote.
+  {
+    const win = await boot({ audience: "commercial", property_type: "retail",
+      bedrooms: null, bathrooms: null, restrooms: 4, floors: 2,
+      frequency: "monthly", services: ["office_cleaning"], night_access: false });
+
+    click(win, '[data-edit="property"]');
+    const types = [...win.document.querySelectorAll('[data-form="property"] [name="property_type"] option')]
+      .map((o) => o.value);
+    check("property: a shop is offered only commercial types",
+      types.length > 0 && !types.includes("condo") && types.includes("retail"),
+      types.join(","));
+    check("property: the current type is selected",
+      win.document.querySelector('[name="property_type"]').value === "retail");
+    click(win, '[data-cancel]');
+
+    click(win, '[data-edit="request"]');
+    const form = win.document.querySelector('[data-form="request"]');
+    check("request: frequency is a dropdown set to the stored value",
+      form.querySelector('[name="frequency"]').value === "monthly");
+    check("request: the services already asked for are ticked",
+      form.querySelector('[data-group="services"][value="office_cleaning"]').checked === true);
+    check("request: a service not asked for is not ticked",
+      form.querySelector('[data-group="services"][value="carpets"]').checked === false);
+    check("request: night access is a single tick", 
+      form.querySelector('[name="night_access"]').type === "checkbox");
+
+    form.querySelector('[data-group="services"][value="carpets"]').checked = true;
+    form.querySelector('[name="night_access"]').checked = true;
+    set(win, "frequency", "weekly");
+    await save(win, "request");
+
+    const sent = patches(win)[0];
+    check("request: frequency travels as its code", sent.frequency === "weekly", sent.frequency);
+    check("request: services travel as an array of codes",
+      Array.isArray(sent.services) &&
+      sent.services.sort().join(",") === "carpets,office_cleaning",
+      JSON.stringify(sent.services));
+    check("request: night access travels as a boolean",
+      sent.night_access === true, JSON.stringify(sent.night_access));
+  }
+
+  // A residential request is not asked commercial questions.
+  {
+    const win = await boot();
+    click(win, '[data-edit="request"]');
+    const names = [...win.document.querySelectorAll('[data-form="request"] [name]')]
+      .map((c) => c.getAttribute("name"));
+    check("a home is not asked about services or night access",
+      !names.includes("services") && !names.includes("night_access"), names.join(","));
+    await save(win, "request");
+    const keys = Object.keys(patches(win)[0]).sort().join(",");
+    check("and neither is sent, so neither can be blanked",
+      keys === "access_notes,desired_start,frequency", keys);
+  }
+
+  // The language of the quote email.
+  {
+    const win = await boot();
+    click(win, '[data-edit="contact"]');
+    check("contact: the language is a dropdown on the stored value",
+      win.document.querySelector('[name="locale"]').value === "fr");
+    set(win, "locale", "en");
+    await save(win, "contact");
+    check("contact: the language travels", patches(win)[0].locale === "en");
   }
 
   // THE BREAKDOWN HAS TO ADD UP. It did not: the card printed 175,74 $ + 15,00 $
